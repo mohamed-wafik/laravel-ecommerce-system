@@ -14,7 +14,7 @@ class OrderController extends Controller
     public function index(Request $req)
     {
         $user = $req->user();
-        $orders = $user->orders()->with('items.product')->get();
+        $orders = $user->orders()->with('itemorders.product')->get();
 
         return response()->json([
             'data' => $orders,
@@ -26,7 +26,7 @@ class OrderController extends Controller
     public function show(Request $req, $id)
     {
         $user = $req->user();
-        $order = $user->orders()->with('items.product')->find($id);
+        $order = $user->orders()->with('itemOrders.product')->find($id);
 
         if (!$order) {
             return response()->json([
@@ -42,19 +42,18 @@ class OrderController extends Controller
             'status' => 200,
         ]);
     }
-
     public function store(Request $req)
     {
         $req->validate([
             'country' => 'required|string|max:100',
-            'products' => 'required|array',
-            'products.*.id' => 'required|integer|exists:products,id',
-            'products.*.quantity' => 'required|integer|min:1',
+            'data' => 'required|array',
+            'data.*.id' => 'required|integer|exists:products,id',
+            'data.*.quantity' => 'required|integer|min:1',
         ]);
 
         $user = $req->user();
         $country = $req->input('country');
-        $products = $req->input('products');
+        $products = $req->input('data'); 
 
         $totalAmount = 0;
         $itemOrders = [];
@@ -69,16 +68,16 @@ class OrderController extends Controller
                 ], 404);
             }
 
-            if($product->stock < $item['quantity']) {
+            if ($product->stock < $item['quantity']) {
                 return response()->json([
                     'data' => null,
-                    'message' => 'Insufficient stock for product: ' . $product->name,
+                    'message' => 'Insufficient stock for product: ' . $product->title,
                     'status' => 400,
                 ], 400);
             }
 
             $discount = $product->discount ?? 0;
-            $priceAfterDiscount = $product->price - ($product->price * ($discount / 100));
+            $priceAfterDiscount = $product->price - ($product->price * $discount);
             $subtotal = $priceAfterDiscount * $item['quantity'];
             $totalAmount += $subtotal;
 
@@ -91,7 +90,6 @@ class OrderController extends Controller
         }
 
         Stripe::setApiKey(env('STRIPE_SECRET'));
-
         $sessionPayment = StripeSession::create([
             'payment_method_types' => ['card'],
             'line_items' => [[
@@ -113,11 +111,12 @@ class OrderController extends Controller
             'country' => $country,
             'total_amount' => $totalAmount,
             'payment_status' => 'pending',
-            'payment_tsession_id' => $sessionPayment->id,
+            'payment_tsession_id' => $sessionPayment->id, 
+            'payment_id' => $sessionPayment->url,
         ]);
 
         foreach ($itemOrders as $itemOrder) {
-            $order->items()->create($itemOrder);
+            $order->itemOrders()->create($itemOrder);
         }
 
         return response()->json([

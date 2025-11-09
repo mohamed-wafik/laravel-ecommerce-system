@@ -28,7 +28,7 @@
                 <button id="userMenuButton"  class="flex items-center space-x-3 p-2 rounded-xl hover:bg-gray-100 transition-colors">
                     <div class="flex-shrink-0 h-10 w-10">
                         <img class="h-10 w-10 rounded-full border-2 border-gray-200 group-hover:border-primary-200 transition-colors" 
-                                src="{{ Auth::user()->avatar ? asset('storage/' . Auth::user()->avatar) : 'https://via.placeholder.com/150/cccccc/969696?text=No+Image' }}" 
+                                src="{{ Auth::user()->avatar ? asset('storage/' . Auth::user()->avatar) : asset("storage/images/default_avatar.webp") }}" 
                                 alt="{{ Auth::user()->name }}">
                     </div>
                     <div class="hidden md:block text-left">

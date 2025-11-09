@@ -180,7 +180,7 @@
         </div>
     </div>
 
-    <div class="space-y-6">
+    <div class="space-y-6 mt-6">
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">Account Overview</h2>
 

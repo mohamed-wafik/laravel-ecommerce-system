@@ -53,20 +53,12 @@
         </nav>
 
         <div class="p-4 border-t border-gray-200">
-            <div class="flex items-center space-x-3">
-                <div class="flex-shrink-0 h-10 w-10">
-                    <img class="h-10 w-10 rounded-full border-2 border-gray-200 group-hover:border-primary-200 transition-colors" 
-                            src="{{ Auth::user()->avatar ? asset('storage/' . Auth::user()->avatar) : 'https://via.placeholder.com/150/cccccc/969696?text=No+Image' }}" 
-                            alt="{{ Auth::user()->name }}">
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900 truncate">{{ Auth::user()->name }}</p>
-                    <p class="text-xs text-gray-500 truncate">{{ Auth::user()->email}}</p>
-                </div>
-                <button class="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
-                    <i class="fas fa-chevron-down text-sm"></i>
+            <a href="{{ route("logout")}}">
+                <button class="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-300 border border-red-200 rounded-lg hover:bg-red-200 transition-colors cursoe-pointer">
+                    <i class="fa-solid fa-sign-out-alt"></i>
+                    Logout
                 </button>
-            </div>
+            </a>
         </div>
     </div>
 </div>

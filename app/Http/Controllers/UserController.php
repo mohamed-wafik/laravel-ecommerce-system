@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\usersExport;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Request;
-use Exception;
+use Maatwebsite\Excel\Facades\Excel;
 
 class UserController extends Controller
 {
@@ -70,4 +71,8 @@ class UserController extends Controller
                 ->json(['message' => 'User deleted successfully.'], 200);
     }
 
+    public function exportUsers()
+    {
+        return Excel::download(new usersExport, 'users.xlsx');
+    }
 }

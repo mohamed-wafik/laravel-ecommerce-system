@@ -1,18 +1,13 @@
 @extends('layout.dashboard')
-
-@section('avatar', 'https://i.pravatar.cc/100')
-
 @section("content")
-    <!-- Stats Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <!-- Users Card -->
         <div class="stat-card group">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">Total Users</p>
                     <h3 class="text-3xl font-bold text-gray-900 mt-2">{{ $countUsers }}</h3>
                     <div class="flex items-center mt-3">
-                        <span class="text-sm text-success font-medium">+12%</span>
+                        <span class="text-sm text-success font-medium">{{ number_format($userPercentChange,2) }}%</span>
                         <span class="text-sm text-gray-500 ml-2">from last week</span>
                     </div>
                 </div>
@@ -22,19 +17,18 @@
             </div>
             <div class="mt-4">
                 <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-primary-600 h-2 rounded-full" style="width: 75%"></div>
+                    <div class="bg-primary-600 h-2 rounded-full" style="width: {{$userPercentChange}}%"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Products Card -->
         <div class="stat-card group">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">Total Products</p>
                     <h3 class="text-3xl font-bold text-gray-900 mt-2">{{ $countProducts }}</h3>
                     <div class="flex items-center mt-3">
-                        <span class="text-sm text-success font-medium">+8%</span>
+                        <span class="text-sm text-success font-medium">{{ number_format($productPercentChange,2) }}%</span>
                         <span class="text-sm text-gray-500 ml-2">from last week</span>
                     </div>
                 </div>
@@ -44,19 +38,18 @@
             </div>
             <div class="mt-4">
                 <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-blue-600 h-2 rounded-full" style="width: 65%"></div>
+                    <div class="bg-blue-600 h-2 rounded-full" style="width: {{$productPercentChange}}%"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Categories Card -->
         <div class="stat-card group">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">Total Categories</p>
                     <h3 class="text-3xl font-bold text-gray-900 mt-2">{{ $countCategories }}</h3>
                     <div class="flex items-center mt-3">
-                        <span class="text-sm text-success font-medium">+5%</span>
+                        <span class="text-sm text-success font-medium">{{number_format($categoryPercentChange,2)}}%</span>
                         <span class="text-sm text-gray-500 ml-2">from last week</span>
                     </div>
                 </div>
@@ -66,19 +59,18 @@
             </div>
             <div class="mt-4">
                 <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-green-600 h-2 rounded-full" style="width: 50%"></div>
+                    <div class="bg-green-600 h-2 rounded-full" style="width: {{$categoryPercentChange}}%"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Orders Card -->
         <div class="stat-card group">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600">Total Orders</p>
                     <h3 class="text-3xl font-bold text-gray-900 mt-2">{{ $countOrders }}</h3>
                     <div class="flex items-center mt-3">
-                        <span class="text-sm text-success font-medium">+23%</span>
+                        <span class="text-sm text-success font-medium">+{{number_format($orderPercentChange,1)}}%</span>
                         <span class="text-sm text-gray-500 ml-2">from last week</span>
                     </div>
                 </div>
@@ -88,13 +80,12 @@
             </div>
             <div class="mt-4">
                 <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-amber-600 h-2 rounded-full" style="width: 85%"></div>
+                    <div class="bg-amber-600 h-2 rounded-full" style="width: {{$orderPercentChange}}%"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <!-- Sales Chart -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -209,15 +200,20 @@
         <!-- Top Country -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Country</h3>
-            <div class="flex items-center justify-center py-8">
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-globe-americas text-primary-600 text-xl"></i>
-                    </div>
-                    <h4 class="text-2xl font-bold text-gray-900">{{ $topCountrySales->country ?? 'N/A' }}</h4>
-                    <p class="text-gray-500 mt-2">Top Sales Country</p>
-                    <p class="text-sm text-gray-400">{{ $topCountrySales->total_sales ?? 0 }} orders</p>
-                </div>
+            <div class="flex items-center justify-center py-4">
+                @if($topCountrySales)
+                    <iframe 
+                        class="w-full h-64 rounded-lg border border-gray-200"
+                        loading="lazy"
+                        allowfullscreen
+                        referrerpolicy="no-referrer-when-downgrade"
+                        src="https://www.google.com/maps?q={{ urlencode($topCountrySales->country) }}&output=embed">
+                    </iframe>
+                @endif
+            </div>
+            <div class="text-center mt-4">
+                <p class="text-gray-500 mt-1">Top Sales Country</p>
+                <p class="text-sm text-gray-400">{{ $topCountrySales->total_sales ?? 0 }} orders</p>
             </div>
         </div>
 
@@ -264,6 +260,38 @@
             </div>
         </div>
     </div>
+    <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Top 5 Products</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-gray-50">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TITLE</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PRICE ($)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ORDERS</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    @forelse($topProducts as $product)
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $product->id }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ $product->title }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ $product->price }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ $product->orders_count }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="px-4 py-3 text-center text-gray-400">No products found</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('script')

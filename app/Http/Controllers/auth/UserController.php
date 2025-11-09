@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
+    public function showLoginForm() {
+        return view('auth.login');
+    }
+    public function showRegisterForm() {
+       return view('auth.register');
+    }
     /**
      * Handle user login
      */
@@ -21,7 +27,7 @@ class UserController extends Controller
 
         if (Auth::attempt($credentials)) {
             $request->session()->regenerate();
-            return redirect()->intended('/dashboard')
+            return redirect()->intended('/')
                 ->with('success', 'Logged in successfully!');
         }
 
@@ -45,7 +51,7 @@ class UserController extends Controller
 
         Auth::login($user);
 
-        return redirect('/dashboard')->with('success', 'Registration successful!');
+        return redirect('/')->with('success', 'Registration successful!');
     }
 
     /**

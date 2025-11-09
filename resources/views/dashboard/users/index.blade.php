@@ -15,10 +15,10 @@
             <!-- Actions -->
             <div class="flex items-center gap-3">
                 <!-- Export Button -->
-                <button class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <a href="{{ route("users.export")}}" class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                     <i class="fa-solid fa-download"></i>
                     Export
-                </button>
+                </a>
             </div>
         </div>
     </div>
@@ -87,7 +87,7 @@
                                     <div class="flex items-center">
                                         <div class="flex-shrink-0 h-10 w-10">
                                             <img class="h-10 w-10 rounded-full border-2 border-gray-200 group-hover:border-primary-200 transition-colors" 
-                                                 src="{{ $user['avatar'] ? asset('storage/' . $user['avatar']) : 'https://via.placeholder.com/150/cccccc/969696?text=No+Image' . $user['id'] }}"  
+                                                 src="{{ $user['avatar'] ? asset('storage/' . $user['avatar']) : asset("storage/images/default_avatar.webp") }}"  
                                                  alt="{{ $user["name"] }}">
                                         </div>
                                         <div class="ml-4">
@@ -123,7 +123,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
                                     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200">
                                         <i class="fa-solid fa-shopping-cart mr-2 text-xs"></i>
-                                        {{ $user["orders_count"] ?? 0 }}
+                                        {{ count($user->orders) }}
                                     </span>
                                 </td>
                                 
@@ -173,17 +173,37 @@
         </div>
 
         <!-- Pagination -->
-        @if($users->hasPages())
-            <div class="bg-white px-6 py-4 border-t border-gray-200">
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div class="text-sm text-gray-700">
-                        Showing {{ $users->firstItem() }} to {{ $users->lastItem() }} of {{ $users->total() }} users
-                    </div>
-                    <div class="flex space-x-2">
-                        {{ $users->links() }}
-                    </div>
+                @if(isset($users) && method_exists($users, 'hasPages') && $users->hasPages())
+        <div class="bg-white px-6 py-4 border-t border-gray-200">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-sm text-gray-700">
+                    Showing {{ $users->firstItem() }} to {{ $users->lastItem() }} of {{ $users->total() }} users
+                </div>
+                <div class="flex space-x-2">
+                    @if($users->onFirstPage())
+                        <span class="px-4 py-2 text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed text-sm">
+                            <i class="fa-solid fa-chevron-left mr-2"></i>Previous
+                        </span>
+                    @else
+                        <a href="{{ $users->previousPageUrl() }}" 
+                           class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                            <i class="fa-solid fa-chevron-left mr-2"></i>Previous
+                        </a>
+                    @endif
+
+                    @if($users->hasMorePages())
+                        <a href="{{ $users->nextPageUrl() }}" 
+                           class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                            Next<i class="fa-solid fa-chevron-right ml-2"></i>
+                        </a>
+                    @else
+                        <span class="px-4 py-2 text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed text-sm">
+                            Next<i class="fa-solid fa-chevron-right ml-2"></i>
+                        </span>
+                    @endif
                 </div>
             </div>
+        </div>
         @endif
     </div>
 @endsection

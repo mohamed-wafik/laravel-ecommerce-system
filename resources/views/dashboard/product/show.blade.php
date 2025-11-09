@@ -1,7 +1,4 @@
 @extends('layout.dashboard')
-
-@section('avatar', 'https://i.pravatar.cc/100')
-
 @section("content")
     <!-- Header Section -->
     <div class="mb-6">
@@ -94,9 +91,7 @@
             </div>
         </div>
 
-        <!-- Right Column - Product Info & Actions -->
         <div class="space-y-6">
-            <!-- Product Summary -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4">Product Summary</h2>
                 
@@ -104,11 +99,11 @@
                 <div class="mb-4">
                     <label class="text-sm font-medium text-gray-600">Price</label>
                     <div class="flex items-baseline gap-2 mt-1">
-                        <span class="text-2xl font-bold text-gray-900">${{ number_format($product["price"], 2) }}</span>
-                        @if($product->compare_price)
-                            <span class="text-lg text-gray-500 line-through">${{ number_format($product["discoumt"], 2) }}</span>
+                        <span class="text-2xl font-bold text-gray-900">${{ number_format($product["price"] - ($product["price"] * $product["discount"]),)  }}</span>
+                        @if($product->discount)
+                            <span class="text-lg text-gray-500 line-through">${{ number_format($product["price"], 2) }}</span>
                             <span class="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
-                                {{ number_format((($product["discount"] - $product["price"]) / $product["compare_price"]) * 100, 0) }}% OFF
+                                {{ number_format( $product["discount"],2)   }}% OFF
                             </span>
                         @endif
                     </div>
@@ -118,10 +113,10 @@
                 <div class="mb-4">
                     <label class="text-sm font-medium text-gray-600">Stock Status</label>
                     <div class="mt-1">
-                        @if($product["stock"]> 10)
+                        @if($product["stock"] > 10)
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200">
                                 <i class="fa-solid fa-check-circle mr-2"></i>
-                                In Stock ({{ $product["stock "] }})
+                                In Stock ({{ $product->stock }})
                             </span>
                         @elseif($product["stock"] > 0)
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
@@ -173,13 +168,13 @@
 
                 <!-- Quick Actions -->
                 <div class="space-y-3">
-                    <button onclick="toggleStockAlert()" 
+                    <button  
                             class="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
                         <i class="fa-solid fa-bell"></i>
                         Stock Alert
                     </button>
                     
-                    <button onclick="exportProductData()" 
+                    <button 
                             class="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors">
                         <i class="fa-solid fa-download"></i>
                         Export Data
@@ -252,17 +247,6 @@
 
 @push('script')
 <script>
-    function toggleStockAlert() {
-        // Implement stock alert functionality
-        alert('Stock alert functionality would be implemented here');
-    }
-
-
-    function exportProductData() {
-        // Implement export functionality
-        alert('Export functionality would be implemented here');
-    }
-
     // Image gallery functionality
     document.addEventListener('DOMContentLoaded', function() {
         const mainImage = document.querySelector('.aspect-w-1 img');

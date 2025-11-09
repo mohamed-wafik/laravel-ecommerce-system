@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Order;
 use App\Models\Product;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ItemOrder extends Model
 {
+    use HasFactory;
+    
     protected $fillable = [
         'order_id',
         'product_id',
@@ -31,4 +34,3 @@ class ItemOrder extends Model
                     ->withTimestamps();
     }
 }
-

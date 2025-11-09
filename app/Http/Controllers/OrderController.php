@@ -2,8 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\OrdersExport;
+use App\Mail\OrderStatusMail;
 use App\Models\Order;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Maatwebsite\Excel\Facades\Excel;
 
 class OrderController extends Controller
 {
@@ -17,7 +22,7 @@ class OrderController extends Controller
 
         $orders = Order::with(["user", "itemOrders"])->latest()->paginate(10);
 
-        return view("dashboard.orders",
+        return view("dashboard.orders.index",
          compact(
             "countOrders",
             "countOfOrderPending",
@@ -30,20 +35,66 @@ class OrderController extends Controller
         $order = Order::with(["user","products"])->find($id);
         return view("dashboard.orders.show",compact("order"));
     }
-    public function update(Request $request, $id)
+    public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
-            'status' => 'required|string|in:pending,processing,shipped,delivered,cancelled',
-            'country' => 'nullable|string|max:100',
-            'total_amount' => 'nullable|numeric|min:0',
+            "status" => "required|in:pending,processing,completed,cancelled",
         ]);
 
-        $order = Order::find($id);
-        $order->update($validated);
+        $order = Order::findorFail($id);
+        if(!$order) {
+            return response()->json(["message" => "Order not found"], 404);
+        }
+        $order->status = $validated["status"];
+        $order->save();
+        return response()->json(["message" => "Order status updated successfully"]);
+    }
+    public function destory($id)
+    {
+        $order = Order::findorFail($id);
+        if(!$order) {
+            return redirect()
+                    ->back()
+                    ->with("error", "Order not found");
+        }
+        if($order->status !== 'cancelled') {
+            return redirect()
+                    ->back()
+                    ->with("error", "Only cancelled orders can be deleted");
+        }
+        if(!empty($order->itemorders)) {
+            $order->itemorders()->delete();
+        }
+        $order->delete();
+        return redirect()
+                ->back()
+                ->with("success", "Order deleted successfully");
+    }
+    public function exportOrder() {
+        return Excel::download(new OrdersExport, 'orders.xlsx');
+    }
+    public function printOrder($id)
+    {
+        $order = Order::with(['user', 'itemOrders.product'])->findOrFail($id);
+
+        $pdf = Pdf::loadView('dashboard.orders.invoice', compact('order'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download("invoice_order_{$order->id}.pdf");
+    }
+    public function resetEmail($id)
+    {
+        $order = Order::with('user')->findOrFail($id);
+        if (!$order) {
+            return redirect()
+                ->back()
+                ->with('error', 'Order not found');
+        }
+        
+        Mail::to($order->user->email)->send(new OrderStatusMail($order));
 
         return redirect()
             ->back()
-            ->with('success', 'Order updated successfully!');
+            ->with('success', 'Order status email resent successfully');
     }
 }
-

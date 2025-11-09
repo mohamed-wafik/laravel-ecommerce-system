@@ -23,7 +23,7 @@
         <!-- Avatar -->
         <div class="flex-shrink-0">
             <img class="h-32 w-32 rounded-full border-4 border-gray-200 object-cover"
-                 src="{{ $user["avatar"] ? asset('storage/'.$user["avatar"]) : 'https://via.placeholder.com/150/cccccc/969696?text=No+Image' }}"
+                 src="{{ $user["avatar"] ? asset('storage/'.$user["avatar"]) : asset("storage/images/default_avatar.webp") }}"
                  alt="{{ $user["name"] }}">
         </div>
 
@@ -98,10 +98,10 @@
                                 {{ ucfirst($order->status) }}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-sm text-gray-900">${{ number_format($order->total, 2) }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${{ number_format($order->total_amount, 2) }}</td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $order->created_at->format('M d, Y') }}</td>
                         <td class="px-6 py-4 text-right text-sm">
-                            <a href="{{ route('admin.orders.show', $order->id) }}" 
+                            <a href="{{ route('orders.show', $order->id) }}" 
                                class="text-blue-600 hover:text-blue-800 font-medium">
                                 View
                             </a>

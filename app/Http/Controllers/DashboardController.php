@@ -17,6 +17,11 @@ class DashboardController extends Controller
         $countProducts = Product::count();
         $countCategories = Category::count();
         $countOrders = Order::count();
+        
+        $userPercentChange = $countUsers > 0 ? (User::where('created_at', '>=', now()->subWeek())->count() / $countUsers) * 100 : 0;
+        $productPercentChange = $countProducts > 0 ? (Product::where('created_at', '>=', now()->subWeek())->count() / $countProducts) * 100 : 0;
+        $orderPercentChange = $countOrders > 0 ? (Order::where('order_date', '>=', now()->subWeek())->count() / $countOrders) * 100 : 0;
+        $categoryPercentChange = $countCategories > 0 ? (Category::where('created_at', '>=', now()->subWeek())->count() / $countCategories) * 100 : 0;
 
         $lowStockProducts = Product::where('stock', '<=', 5)
             ->take(10)
@@ -80,7 +85,11 @@ class DashboardController extends Controller
             'statusOfOrders',
             'salesLast7Days',
             'topCountrySales',
-            'salesLast30Days'
+            'salesLast30Days',
+            'userPercentChange',
+            'productPercentChange',
+            'orderPercentChange',
+            'categoryPercentChange'
         ));
     }
 }

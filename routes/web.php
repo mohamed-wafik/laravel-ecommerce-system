@@ -1,27 +1,26 @@
 <?php
 
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\auth\UserController;
+use App\Http\Controllers\UserController as ControllersUserController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FacebookController;
 use App\Http\Controllers\GoogleController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PorfolioController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\UserController as ControllersUserController;
+use App\Http\Controllers\WelcomeController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Mail;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [WelcomeController::class, 'index']);
 
-Route::get("/login",function() {
-    return view('auth.login');
-})->name("login");
+Route::get("/login",[UserController::class, "showLoginForm"])->name("login");
+
 Route::post("/login",[UserController::class, "login"]);
-Route::get("/register",function() {
-    return view('auth.register');
-})->name("register");
+
+Route::get("/register",[UserController::class, "showRegisterForm"])->name("register");
+
 Route::post("/register",[UserController::class, "register"]);
 
 Route::controller(GoogleController::class)->group(function () {
@@ -35,20 +34,24 @@ Route::controller(FacebookController::class)->group(function () {
     Route::get('auth/facebook', 'redirectToFacebook')->name('auth.facebook');
     Route::get('auth/facebook/callback', 'handleFacebookCallback');
 });
+
 Route::middleware(["auth" , "isAdmin" ])->group(function () {
     Route::prefix("/dashboard")->group(function () {
         Route::get("/", [DashboardController::class, "index"])->name("dashboard.index");
     
         Route::resource('/products', ProductController::class);
     
-        Route::get("/orders", function () {
-            return view("dashboard.orders.index");
-        })->name("dashboard.orders");
+        Route::get("/orders", [OrderController::class , "index"])->name("dashboard.orders");
+        Route::get("/orders/{id}", [OrderController::class , "show"])->name("orders.show");
+        Route::put("/orders/{id}/update-status", [OrderController::class , "updateStatus"])->name("orders.update"); 
+        Route::get("/orders-export", [OrderController::class , "exportOrder"])->name("orders.export");
+        Route::get("/orders/{id}/print", [OrderController::class , "printOrder"])->name("orders.print");
     
         Route::resource('/categories', CategoryController::class);
     
         Route::get("/users", [ControllersUserController::class , "index"])->name("dashboard.users");
         Route::get("/users/{id}", [ControllersUserController::class , "show"])->name("users.show");
+        Route::get("/users-export", [ControllersUserController::class , "exportUsers"])->name("users.export");
         Route::put("/users/{id}/role", [ControllersUserController::class , "updateRole"]);
         Route::delete("/users/{id}", [ControllersUserController::class , "destroy"])->name("users.destroy");
     
@@ -58,22 +61,18 @@ Route::middleware(["auth" , "isAdmin" ])->group(function () {
         Route::put("/portfolio/changePassword/{id}",[PorfolioController::class , "changePassword"])->name("user.changePassword");
     });
 });
+Route::get('/forgot-password', [PasswordResetController::class, 'showForgotForm'])
+    ->middleware('guest')
+    ->name('password.request');
 
-Route::get('/test-mail', function () {
-    try {
-        Mail::raw('This is a test email from Laravel using Mailtrap!', function ($message) {
-            $message->to('test@example.com')
-                    ->subject('Laravel Test Mail');
-        });
+Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])
+    ->middleware('guest')
+    ->name('password.email');
 
-        return '✅ Email sent! Check your Mailtrap inbox.';
-    } catch (\Exception $e) {
-        return '❌ Error: ' . $e->getMessage();
-    }
-});
-// Route::prefix('settings')->group(function () {
-//     Route::get('/', [SettingsController::class, 'index'])->name('settings.index');
-//     Route::put('/', [SettingsController::class, 'update'])->name('settings.update');
-//     Route::post('/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
-//     Route::post('/create-backup', [SettingsController::class, 'createBackup'])->name('settings.create-backup');
-// });
+Route::get('/reset-password/{token}', [PasswordResetController::class, 'showResetForm'])
+    ->middleware('guest')
+    ->name('password.reset');
+
+Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])
+    ->middleware('guest')
+    ->name('password.update');
