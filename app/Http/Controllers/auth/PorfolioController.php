@@ -1,8 +1,10 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\auth;
 
+use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\CloudinaryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -10,7 +12,14 @@ use Illuminate\Support\Facades\Storage;
 
 class PorfolioController extends Controller
 {
-   public function index() {
+    private CloudinaryService $cloudinaryService;
+
+    public function __construct(CloudinaryService $cloudinaryService)
+    {
+        $this->cloudinaryService = $cloudinaryService;
+    }   
+
+    public function index() {
         return view("dashboard.settings.index");
     }
 
@@ -22,9 +31,9 @@ class PorfolioController extends Controller
             return redirect()->back()->with("error", "User not found!");
         }
 
-        // if (Auth::id() !== $id) {
-        //     abort(403, 'Unauthorized action.');
-        // }
+        if (Auth::id() !== +$id) {
+            abort(403, 'Unauthorized action.');
+        }
 
         $validated = $request->validate([
             "name" => "nullable|string|min:2|max:50",
@@ -32,14 +41,21 @@ class PorfolioController extends Controller
             "image" => "nullable|image|mimes:jpg,jpeg,png,gif|max:2048",
         ]);
 
-        // Handle avatar upload
         if ($request->hasFile('image')) {
-            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
-                Storage::disk('public')->delete($user->avatar);
+            
+            if ($user->avatar_public_id) {
+                $check = $this->cloudinaryService->deleteFile($user->avatar_public_id);
+                if (!$check) {
+                    return redirect()->back()
+                        ->with('error', 'Failed to delete existing avatar from Cloudinary!');
+                }
             }
 
-            $path = $request->file('image')->store('images', 'public');
-            $validated['avatar'] = $path;
+            $result = $this->cloudinaryService->uploadFile($request->file('image'));
+
+
+            $validated['avatar'] = $result['secure_url'] ?? ($result['url'] ?? null);
+            $validated['avatar_public_id'] = $result['public_id'] ?? null;
         }
 
         $user->update($validated);
@@ -86,8 +102,14 @@ class PorfolioController extends Controller
             ], 403);
         }
 
-        if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
-            Storage::disk('public')->delete($user->avatar);
+        if ($user->avatar_public_id) {
+            $result =$this->cloudinaryService->deleteFile($user->avatar_public_id);
+            if (!$result) {
+                return response()->json([
+                    "message" => "Failed to delete avatar from Cloudinary!",
+                    "success" => false
+                ], 500);
+            }
         }
 
         $user->update(['avatar' => null]);
@@ -106,8 +128,13 @@ class PorfolioController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
-        if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
-            Storage::disk('public')->delete($user->avatar);
+        if ($user->avatar_public_id) {
+            $result = $this->cloudinaryService->deleteFile($user->avatar_public_id);
+
+            if (!$result) {
+                return redirect()->back()
+                    ->with('error', 'Failed to delete avatar from Cloudinary!');
+            }
         }
 
         $user->delete();

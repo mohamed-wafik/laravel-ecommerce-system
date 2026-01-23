@@ -8,6 +8,8 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Order;
 use App\Models\ItemOrder;
+use App\Models\Cart;
+use App\Models\Review;
 
 class DatabaseSeeder extends Seeder
 {
@@ -26,18 +28,16 @@ class DatabaseSeeder extends Seeder
             });
 
         // --- 2️⃣ Create Users ---
-        // One known user for testing login
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
 
-        // Additional fake users
         $users = User::factory(20)->create();
 
-        // --- 3️⃣ Create Orders & ItemOrders ---
         $products = Product::all();
 
+        // --- 3️⃣ Create Orders & ItemOrders ---
         foreach ($users as $user) {
             $ordersCount = rand(1, 3);
 
@@ -70,8 +70,33 @@ class DatabaseSeeder extends Seeder
 
                 $order->update(['total_amount' => round($total, 2)]);
             }
+
+            // --- 4️⃣ Create Cart Items ---
+            $cartProducts = $products->random(rand(1, 5));
+            foreach ($cartProducts as $product) {
+                Cart::create([
+                    'user_id' => $user->id,
+                    'product_id' => $product->id,
+                    'quantity' => rand(1, 3),
+                ]);
+            }
         }
 
-        $this->command->info('✅ Database seeded successfully with fake data.');
+        // --- 5️⃣ Create Reviews ---
+        foreach ($products as $product) {
+            $reviewCount = rand(0, 5);
+            $reviewUsers = $users->random(min($reviewCount, $users->count()));
+
+            foreach ($reviewUsers as $user) {
+                Review::create([
+                    'user_id' => $user->id,
+                    'product_id' => $product->id,
+                    'rating' => rand(1, 5),
+                    'comment' => fake()->sentence(),
+                ]);
+            }
+        }
+
+        $this->command->info('✅ Database seeded successfully with fake data including Cart & Reviews.');
     }
 }

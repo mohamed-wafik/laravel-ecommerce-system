@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CheckAdmin;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,21 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'isAdmin' => CheckAdmin::class,
         ]);
+    })
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->api(prepend: [
+            \App\Http\Middleware\AuthenticateFromCookie::class,
+        ]);
+        
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+        ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('orders:release-unpaid')
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->runInBackground();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //handler response for api routes

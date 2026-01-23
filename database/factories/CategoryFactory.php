@@ -17,7 +17,7 @@ class CategoryFactory extends Factory
         return [
             'title' => ucfirst($name),
             'description' => $this->faker->sentence(8),
-            'image' => $this->faker->imageUrl(640, 480, $name, true),
+            'image' => $this->faker->imageUrl(),
         ];
     }
 }

@@ -9,12 +9,13 @@ use Illuminate\Support\Facades\Mail;
 
 class TestOrderEmails extends Command
 {
-    protected $signature = 'email:test-order {order? : The ID of the order to test with}';
+    protected $signature = 'email:test-order {order? : The ID of the order to test with} {--to= : Override recipient email}';
     protected $description = 'Test order status email notifications';
 
     public function handle()
     {
         $orderId = $this->argument('order');
+        $overrideEmail = $this->option('to');
         
         if ($orderId) {
             $order = Order::with(['user', 'itemOrders.product'])->find($orderId);
@@ -34,12 +35,26 @@ class TestOrderEmails extends Command
 
         $this->info("Testing email for Order #{$order->id}...");
         
+                if ($overrideEmail) {
+                    if (!filter_var($overrideEmail, FILTER_VALIDATE_EMAIL)) {
+                        $this->error("Invalid email provided for --to: {$overrideEmail}");
+                        return 1;
+                    }
+                    $this->info("Overriding recipient to: {$overrideEmail}");
+                }
+        
         try {
-            Mail::to($order->user->email)
+            $recipient = $overrideEmail ?? ($order->user->email ?? null);
+            if (!$recipient) {
+                $this->error('No recipient email available for this order.');
+                return 1;
+            }
+
+            Mail::to($recipient)
                 ->send(new OrderStatusMail($order));
                 
             $this->info('✓ Test email sent successfully!');
-            $this->info("Recipient: {$order->user->email}");
+            $this->info("Recipient: {$recipient}");
             $this->info("Order Status: {$order->status}");
             $this->info("Payment Status: {$order->payment_status}");
             

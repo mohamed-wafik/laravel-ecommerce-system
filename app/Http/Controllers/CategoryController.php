@@ -4,11 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCategoryRequest;
 use App\Models\Category;
+use App\Services\CloudinaryService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class CategoryController extends Controller
 {
+    private CloudinaryService $cloudinaryService;
+    
+    public function __construct(CloudinaryService $cloudinaryService)
+    {
+        $this->cloudinaryService = $cloudinaryService;
+    }
     public function index()
     {
         $categories = Category::with('products')->paginate(10);
@@ -20,8 +26,9 @@ class CategoryController extends Controller
         $data = $request->validated();
 
         if($request->hasFile('image')) {
-            $path = $request->file('image')->store('images', 'public');
-            $data['image'] = $path;
+            $result = $this->cloudinaryService->uploadFile($request->file('image'));
+            $data['image'] = $result['secure_url'] ?? ($result['url'] ?? null);
+            $data['image_public_id'] = $result['public_id'] ?? null;
         }
 
         Category::create($data);
@@ -59,11 +66,19 @@ class CategoryController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            if ($category->image && Storage::disk('public')->exists($category->image)) {
-                Storage::disk('public')->delete($category->image);
+            if ($category->image_public_id) {
+
+                $check =$this->cloudinaryService->deleteFile($category->image_public_id);
+
+                if (!$check) {
+                    return redirect()->back()
+                        ->with('error', 'Failed to delete existing image from Cloudinary!');
+                }
             }
-            $path = $request->file('image')->store('images', 'public');
-            $validated['image'] = $path;
+
+            $result = $this->cloudinaryService->uploadFile($request->file('image'));
+            $validated['image'] = $result['secure_url'] ?? ($result['secure_url'] ?? null);
+            $validated['image_public_id'] = $result['public_id'] ?? null;
         }
 
         $category->update($validated);
@@ -87,6 +102,15 @@ class CategoryController extends Controller
                 ->with('error', 'Cannot delete category with products!');
         }
 
+        if ($category->image_public_id) {
+            $check = $this->cloudinaryService->deleteFile($category->image_public_id);
+
+            if (!$check) {
+                return redirect()->back()
+                    ->with('error', 'Failed to delete image from Cloudinary!');
+            }
+        }
+        
         $category->delete();
 
         return redirect()->back()

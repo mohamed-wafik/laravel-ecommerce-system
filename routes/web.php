@@ -1,14 +1,14 @@
 <?php
 
+use App\Http\Controllers\auth\FacebookController;
+use App\Http\Controllers\auth\GoogleController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\auth\PorfolioController;
 use App\Http\Controllers\auth\UserController;
 use App\Http\Controllers\UserController as ControllersUserController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\FacebookController;
-use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\OrderController;
-use App\Http\Controllers\PorfolioController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\WelcomeController;
 use Illuminate\Support\Facades\Route;

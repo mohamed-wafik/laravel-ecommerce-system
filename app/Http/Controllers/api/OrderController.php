@@ -2,127 +2,139 @@
 
 namespace App\Http\Controllers\api;
 
+use App\Http\Controllers\api\BaseController;
 use App\Http\Controllers\Controller;
+use App\Models\Cart;
 use App\Models\ItemOrder;
 use App\Models\Product;
-use Stripe\Stripe;
-use Stripe\Checkout\Session as StripeSession;
+use App\Http\Resources\OrderResource;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Stripe\Stripe;
 
-class OrderController extends Controller
+class OrderController extends BaseController
 {
     public function index(Request $req)
     {
         $user = $req->user();
-        $orders = $user->orders()->with('itemorders.product')->get();
 
-        return response()->json([
-            'data' => $orders,
-            'message' => 'Orders retrieved successfully',
-            'status' => 200,
-        ]);
+        $orders = $user->orders()->with('itemOrders.product')->get();
+
+        return $this->sendResponse(OrderResource::collection($orders), 'Orders retrieved successfully');
     }
 
     public function show(Request $req, $id)
     {
         $user = $req->user();
-        $order = $user->orders()->with('itemOrders.product')->find($id);
+
+        $order = $user->orders()
+                      ->with('itemOrders.product')
+                      ->find($id);
 
         if (!$order) {
-            return response()->json([
-                'data' => null,
-                'message' => 'Order not found',
-                'status' => 404,
-            ], 404);
+            return $this->sendError('Order not found', [], 404);
         }
 
-        return response()->json([
-            'data' => $order,
-            'message' => 'Order retrieved successfully',
-            'status' => 200,
-        ]);
+        return $this->sendResponse(OrderResource::make($order), 'Order retrieved successfully');
     }
+
+    /**
+     * Create order using CART TABLE
+     */
     public function store(Request $req)
     {
         $req->validate([
             'country' => 'required|string|max:100',
-            'data' => 'required|array',
-            'data.*.id' => 'required|integer|exists:products,id',
-            'data.*.quantity' => 'required|integer|min:1',
         ]);
 
         $user = $req->user();
-        $country = $req->input('country');
-        $products = $req->input('data'); 
+
+        $carts = Cart::where('user_id', $user->id)
+            ->with('product')
+            ->get();
+
+        if ($carts->isEmpty()) {
+            return $this->sendError('Cart is empty', [], 400);
+        }
 
         $totalAmount = 0;
+        $lineItems = [];
         $itemOrders = [];
 
-        foreach ($products as $item) {
-            $product = Product::find($item['id']);
-            if (!$product) {
-                return response()->json([
-                    'data' => null,
-                    'message' => 'Product not found',
-                    'status' => 404,
-                ], 404);
+        DB::beginTransaction();
+
+        try {
+            foreach ($carts as $cart) {
+                $product = Product::where('id', $cart->product_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$product) {
+                    throw new \Exception('A product in cart does not exist anymore.');
+                }
+
+                if ($product->stock < $cart->quantity) {
+                    throw new \Exception("Insufficient stock for: {$product->title}");
+                }
+
+                $product->decrement('stock', $cart->quantity);
+
+                $discount = $product->discount ?? 0;
+                $priceAfterDiscount = $product->price * (1 - $discount);
+                $subtotal = $priceAfterDiscount * $cart->quantity;
+
+                $totalAmount += $subtotal;
+
+                $lineItems[] = [
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'product_data' => [
+                            'name' => $product->title,
+                            'images' => [$product->image],
+                        ],
+                        'unit_amount' => (int) round($priceAfterDiscount * 100),
+                    ],
+                    'quantity' => $cart->quantity,
+                ];
+
+                $itemOrders[] = [
+                    'product_id' => $product->id,
+                    'quantity' => $cart->quantity,
+                    'unit_price' => $priceAfterDiscount,
+                    'subtotal' => $subtotal,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
             }
 
-            if ($product->stock < $item['quantity']) {
-                return response()->json([
-                    'data' => null,
-                    'message' => 'Insufficient stock for product: ' . $product->title,
-                    'status' => 400,
-                ], 400);
-            }
-
-            $discount = $product->discount ?? 0;
-            $priceAfterDiscount = $product->price - ($product->price * $discount);
-            $subtotal = $priceAfterDiscount * $item['quantity'];
-            $totalAmount += $subtotal;
-
-            $itemOrders[] = [
-                'product_id' => $item['id'],
-                'quantity' => $item['quantity'],
-                'unit_price' => $priceAfterDiscount,
-                'subtotal' => $subtotal,
-            ];
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return $this->sendError('Order creation failed', ['error' => $e->getMessage()], 400);
         }
 
-        Stripe::setApiKey(env('STRIPE_SECRET'));
-        $sessionPayment = StripeSession::create([
-            'payment_method_types' => ['card'],
-            'line_items' => [[
-                'price_data' => [
-                    'currency' => 'usd',
-                    'product_data' => [
-                        'name' => 'Order Payment',
-                    ],
-                    'unit_amount' => intval($totalAmount * 100),
-                ],
-                'quantity' => 1,
-            ]],
-            'mode' => 'payment',
-            'success_url' => env('FRONTEND_URL') . '/payment-success?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url' => env('FRONTEND_URL') . '/payment-cancel',
-        ]);
+
 
         $order = $user->orders()->create([
-            'country' => $country,
+            'country' => $req->country,
             'total_amount' => $totalAmount,
             'payment_status' => 'pending',
-            'payment_tsession_id' => $sessionPayment->id, 
-            'payment_id' => $sessionPayment->url,
         ]);
 
-        foreach ($itemOrders as $itemOrder) {
-            $order->itemOrders()->create($itemOrder);
+
+        foreach ($itemOrders as &$item) {
+            $item['order_id'] = $order->id;
         }
 
-        return response()->json([
-            'data' => ['payment_url' => $sessionPayment->url],
-            'message' => 'Order created successfully',
-            'status' => 201,
-        ], 201);
+        ItemOrder::insert($itemOrders);
+
+
+        Cart::where('user_id', $user->id)->delete();
+
+        $order->load('itemOrders.product');
+
+        return $this->sendResponse(OrderResource::make($order), 'Order placed successfully');
+        
     }
+
 }

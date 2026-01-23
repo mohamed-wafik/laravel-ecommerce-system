@@ -47,4 +47,12 @@ return [
         'redirect' => env('FACEBOOK_REDIRECT_URI'),
     ],
 
+    'frontend' => [
+         'url' => env('FRONTEND_URL', 'http://localhost:5173'), // for local dev
+    ],
+    
+    "stripe" => [
+        "secret"  => env("STRIPE_SECRET"),
+        "webhook_secret" => env("STRIPE_WEBHOOK_SECRET")
+    ]
 ];

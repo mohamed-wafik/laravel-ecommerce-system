@@ -61,7 +61,7 @@
                                     <div class="flex-shrink-0">
                                         <img 
                                             class="h-12 w-12 rounded-lg object-cover border-2 border-gray-200 group-hover:border-cyan-200 transition-colors shadow-sm" 
-                                            src="{{ asset('storage/' . $category['image']) }}" 
+                                            src="{{  $category['image'] }}" 
                                             alt="{{ $category['title'] }}"
                                             onerror="this.src='https://via.placeholder.com/48?text=📁'"
                                         >

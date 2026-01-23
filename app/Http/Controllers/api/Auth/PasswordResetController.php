@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\api\BaseController;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 
-class PasswordResetController extends Controller
+class PasswordResetController extends BaseController
 {
     /**
      * Send password reset link
@@ -35,22 +35,15 @@ class PasswordResetController extends Controller
                 ]);
             }
 
-            return response()->json([
-                'status' => 'success',
-                'message' => __($status)
-            ]);
+            return $this->sendResponse(
+                ['status' => __($status)],
+                'Password reset link sent successfully'
+            );
 
         } catch (ValidationException $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
+            return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'An error occurred while sending the reset link'
-            ], 500);
+            return $this->sendError('An error occurred while sending the reset link', [], 500);
         }
     }
 
@@ -70,22 +63,21 @@ class PasswordResetController extends Controller
                 $request->get('token')
             );
 
-            return response()->json([
-                'status' => 'success',
-                'valid' => $status
-            ]);
+            if (!$status) {
+                throw ValidationException::withMessages([
+                    'token' => ['The provided token is invalid or has expired.'],
+                ]);
+            }
+
+            return $this->sendResponse(
+                ['status' => 'Token is valid'],
+                'Token verified successfully'
+            );
 
         } catch (ValidationException $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
+            return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'An error occurred while verifying the token'
-            ], 500);
+            return $this->sendError('An error occurred while verifying the token', [], 500);
         }
     }
 
@@ -119,22 +111,15 @@ class PasswordResetController extends Controller
                 ]);
             }
 
-            return response()->json([
-                'status' => 'success',
-                'message' => __($status)
-            ]);
+            return $this->sendResponse(
+                ['status' => __($status)],
+                'Password has been reset successfully'
+            );
 
         } catch (ValidationException $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
+            return $this->sendError('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'An error occurred while resetting the password'
-            ], 500);
+            return $this->sendError('An error occurred while resetting the password', [], 500);
         }
     }
 }

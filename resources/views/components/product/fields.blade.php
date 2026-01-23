@@ -89,7 +89,6 @@
                 name="image" 
                 id="image"
                 accept="image/*"
-                class="sr-only"
             >
         </label>
         <p class="pl-1">or drag and drop</p>

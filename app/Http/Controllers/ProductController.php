@@ -5,12 +5,19 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreProductRequest;
 use App\Models\Category;
 use App\Models\Product;
-use Illuminate\Support\Facades\Storage;
+use App\Services\CloudinaryService;
 use Illuminate\Http\Request;
 
 
 class ProductController extends Controller
 {
+    private CloudinaryService $cloudinaryService;
+
+    public function __construct(CloudinaryService $cloudinaryService)
+    {
+        $this->cloudinaryService = $cloudinaryService;
+    }
+    
     public function index(Request $request)
     {
         $filters = $request->query();
@@ -40,8 +47,9 @@ class ProductController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('images', 'public');
-            $data['image'] = $path;
+            $result = $this->cloudinaryService->uploadFile($request->file('image'));
+            $data['image'] = $result['secure_url'] ?? ($result['url'] ?? null);
+            $data['image_public_id'] = $result['public_id'] ?? null;
         }
 
         Product::create($data);
@@ -55,29 +63,9 @@ class ProductController extends Controller
         $product = Product::with(['category'])
             ->withCount(['orders',])
             ->findOrFail($id);
-
-        // Get recent orders with this product
-        $recentOrders = $product->orders()
-            ->latest()
-            ->take(5)
-            ->get();
-
-        return view('dashboard.product.show', compact('product', 'recentOrders' ));
+            
+        return view('dashboard.product.show', compact('product' ));
     }
-
-    // public function duplicate($id)
-    // {
-    //     $product = Product::findOrFail($id);
-        
-    //     $newProduct = $product->replicate();
-    //     $newProduct->title = $product->title . ' (Copy)';
-    //     $newProduct->sku = $product->sku . '-COPY';
-    //     $newProduct->status = 'draft';
-    //     $newProduct->save();
-
-    //     return redirect()->route('products.edit', $newProduct->id)
-    //         ->with('success', 'Product duplicated successfully');
-    // }
 
     public function update(StoreProductRequest $request, $id)  
     {
@@ -92,13 +80,17 @@ class ProductController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('image')) {
-            
-            if ($product->image && Storage::disk('public')->exists($product->image)) {
-                Storage::disk('public')->delete($product->image);
+            if ($product->image_public_id) {
+                $check = $this->cloudinaryService->deleteFile($product->image_public_id);
+                if (!$check) {
+                    return redirect()->back()
+                        ->with('error', 'Failed to delete existing image from Cloudinary!');
+                }
             }
 
-            $path = $request->file('image')->store('images', 'public');
-            $data['image'] = $path;
+            $result = $this->cloudinaryService->uploadFile($request->file('image'));
+            $data['image'] = $result['secure_url'] ?? ($result['url'] ?? null);
+            $data['image_public_id'] = $result['public_id'] ?? null;
         } 
 
         $product->update($data);
@@ -116,8 +108,12 @@ class ProductController extends Controller
                 ->with('error', 'Product not found!');
         }
 
-        if ($product->image && Storage::disk('public')->exists($product->image)) {
-            Storage::disk('public')->delete($product->image);
+        if ($product->image_public_id) {
+            $check = $this->cloudinaryService->deleteFile($product->image_public_id);
+            if (!$check) {
+                return redirect()->back()
+                    ->with('error', 'Failed to delete image from Cloudinary!');
+            }
         }
 
         $product->delete();

@@ -2,21 +2,16 @@
 
 namespace App\Http\Controllers\api;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\api\BaseController;
 use App\Models\Category;
-use Illuminate\Http\Request;
 
-class CategoriesController extends Controller
+class CategoriesController extends BaseController
 {
     //
     public function index()
     {
         //
         $categories = Category::all();
-        return response()->json([
-            'data' =>  $categories,
-            'message' => 'Categories retrieved successfully',
-            'status' => 200,
-        ]);
+        return $this->sendResponse($categories, 'Categories retrieved successfully');
     }
 }
