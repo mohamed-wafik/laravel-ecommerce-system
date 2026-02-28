@@ -23,8 +23,13 @@ class Product extends Model
         'image',
         'image_public_id',
         'category_id',
+        'is_active'
     ];
 
+    protected $casts = [
+        'price' => 'decimal:2',
+        'is_active' => 'boolean'
+    ];
     // (1) Each product belongs to one category
     public function category()
     {
@@ -52,7 +57,7 @@ class Product extends Model
     // (5) Product belongs to many orders (through item_orders)
     public function orders()
     {
-        return $this->belongsToMany(Order::class, 'item_orders')
+        return $this->belongsToMany(Order::class, 'order_items')
                     ->withPivot(['quantity', 'price'])   // or unit_price, subtotal if those exist
                     ->withTimestamps();
     }

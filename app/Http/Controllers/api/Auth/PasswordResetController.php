@@ -3,123 +3,166 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\api\BaseController;
+use App\Models\PasswordResetOtp;
 use App\Models\User;
-use Illuminate\Auth\Events\PasswordReset;
+use App\Notifications\OtpNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password as PasswordRule;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rules\Password;
 
 class PasswordResetController extends BaseController
 {
-    /**
-     * Send password reset link
-     */
-    public function sendResetLink(Request $request): JsonResponse
+    public function sendOtp(Request $request): JsonResponse
     {
-        try {
-            $request->validate([
-                'email' => ['required', 'email'],
+        $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+        ]);
+
+        $email = strtolower(trim($request->email));
+
+        $rateLimitKey = 'send-otp:' . $email;
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+            return $this->sendError([
+                'message' => "Too many attempts. Please wait {$seconds} seconds.",
+            ],429);
+        }
+        RateLimiter::hit($rateLimitKey, 15 * 60);
+
+        $user = User::where('email', $email)->first();
+
+        if ($user) {
+            PasswordResetOtp::where('email', $email)->delete();
+
+            $otpPlain = (string) random_int(100000, 999999); 
+
+            PasswordResetOtp::create([
+                'email'      => $email,
+                'otp'        => Hash::make($otpPlain),
+                'token'      => '',              
+                'attempts'   => 0,
+                'verified'   => false,
+                'expires_at' => now()->addMinutes(10),
             ]);
 
-            $status = Password::sendResetLink(
-                $request->only('email')
-            );
-
-            if ($status !== Password::RESET_LINK_SENT) {
-                throw ValidationException::withMessages([
-                    'email' => [__($status)],
-                ]);
-            }
-
-            return $this->sendResponse(
-                ['status' => __($status)],
-                'Password reset link sent successfully'
-            );
-
-        } catch (ValidationException $e) {
-            return $this->sendError('Validation failed', $e->errors(), 422);
-        } catch (\Exception $e) {
-            return $this->sendError('An error occurred while sending the reset link', [], 500);
+            // Send OTP notification
+            // $user->notify(new OtpNotification($otpPlain));
         }
+
+        return $this->sendResponse(null, 'If this email is registered, you will receive an OTP shortly.');
+
     }
 
-    /**
-     * Verify reset token is valid
-     */
-    public function verifyToken(Request $request): JsonResponse
+    public function verifyOtp(Request $request): JsonResponse
     {
-        try {
-            $request->validate([
-                'email' => ['required', 'email'],
-                'token' => ['required', 'string'],
-            ]);
+        $request->validate([
+            'email' => ['required', 'email'],
+            'otp'   => ['required', 'digits:6'],
+        ]);
 
-            $status = Password::tokenExists(
-                $request->get('email'),
-                $request->get('token')
-            );
+        $email = strtolower(trim($request->email));
 
-            if (!$status) {
-                throw ValidationException::withMessages([
-                    'token' => ['The provided token is invalid or has expired.'],
-                ]);
-            }
 
-            return $this->sendResponse(
-                ['status' => 'Token is valid'],
-                'Token verified successfully'
-            );
-
-        } catch (ValidationException $e) {
-            return $this->sendError('Validation failed', $e->errors(), 422);
-        } catch (\Exception $e) {
-            return $this->sendError('An error occurred while verifying the token', [], 500);
+        $ipKey = 'verify-otp:' . $request->ip();
+        if (RateLimiter::tooManyAttempts($ipKey, 10)) {
+            return $this->sendError([
+                'message' => "Too many attempts. Please slow down.",
+            ],429);
         }
-    }
+        RateLimiter::hit($ipKey, 60);
 
-    /**
-     * Reset the password
-     */
+        $record = PasswordResetOtp::where('email', $email)
+            ->where('verified', false)
+            ->latest()
+            ->first();
+
+        $fail = fn () =>  $this->sendError(['message' => 'Invalid or expired OTP.'], 422);
+
+        if (!$record) return $fail();
+        if ($record->isExpired()) {
+            $record->delete();
+            return $fail();
+        }
+        if ($record->isMaxAttemptsReached()) {
+            $record->delete();
+            return $this->sendError(['message' => 'Too many failed attempts. Please request a new OTP.'], 422);
+        }
+
+        if (!$record->verifyOtp($request->otp)) {
+            $record->increment('attempts');
+            return $fail();
+        }
+
+        // OTP is correct — generate a secure reset token
+        $token = Str::random(64);
+
+        $record->update([
+            'token'      => Hash::make($token),
+            'verified'   => true,
+            'expires_at' => now()->addMinutes(15), // token valid 15 min
+        ]);
+
+        RateLimiter::clear($ipKey);
+
+        return $this->sendResponse(['token'   => $token],"OTP verified successfully.");
+
+    }
     public function resetPassword(Request $request): JsonResponse
     {
-        try {
-            $request->validate([
-                'token' => ['required'],
-                'email' => ['required', 'email'],
-                'password' => ['required', 'confirmed', PasswordRule::defaults()],
-            ]);
+        $request->validate([
+            'email'    => ['required', 'email'],
+            'token'    => ['required', 'string', 'size:64'],
+            'password' => [
+                'required',
+                'confirmed',
+                Password::min(8)
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ],
+        ]);
 
-            $status = Password::reset(
-                $request->only('email', 'password', 'password_confirmation', 'token'),
-                function (User $user, string $password) {
-                    $user->forceFill([
-                        'password' => Hash::make($password),
-                        'remember_token' => Str::random(60),
-                    ])->save();
+        $email = strtolower(trim($request->email));
 
-                    event(new PasswordReset($user));
-                }
-            );
+        $resetKey = 'reset-password:' . $email;
 
-            if ($status !== Password::PASSWORD_RESET) {
-                throw ValidationException::withMessages([
-                    'email' => [__($status)],
-                ]);
-            }
-
-            return $this->sendResponse(
-                ['status' => __($status)],
-                'Password has been reset successfully'
-            );
-
-        } catch (ValidationException $e) {
-            return $this->sendError('Validation failed', $e->errors(), 422);
-        } catch (\Exception $e) {
-            return $this->sendError('An error occurred while resetting the password', [], 500);
+        if (RateLimiter::tooManyAttempts($resetKey, 5)) {
+            return $this->sendError(['message' => 'Too many reset attempts. Please try again later.'], 429);
         }
+
+        RateLimiter::hit($resetKey, 3600);
+
+        $record = PasswordResetOtp::where('email', $email)
+            ->where('verified', true)
+            ->latest()
+            ->first();
+
+        if (! $record || $record->isExpired() || ! Hash::check($request->token, $record->token)) {
+            return $this->sendError(['message' => 'Invalid or expired reset token.'], 422);
+        }
+
+        $user = User::where('email', $email)->first();
+
+        if (! $user) {
+            return $this->sendError(['message' => 'User not found.'], 404);
+        }
+
+        if (Hash::check($request->password, $user->password)) {
+
+            return $this->sendError(['message' => 'New password must be different from your current password.'], 422);
+        }
+
+        $user->forceFill(['password' => Hash::make($request->password)])->save();
+        $user->tokens()->delete();    
+
+        $record->delete();
+        RateLimiter::clear($resetKey);
+
+        return $this->sendResponse(null,'Password reset successfully. Please log in.');
+
     }
 }

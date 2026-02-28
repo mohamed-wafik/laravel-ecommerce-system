@@ -11,6 +11,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\WelcomeController;
+use App\Http\Controllers\HandlerController;
+use App\Http\Controllers\SearchController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [WelcomeController::class, 'index']);
@@ -38,8 +40,11 @@ Route::controller(FacebookController::class)->group(function () {
 Route::middleware(["auth" , "isAdmin" ])->group(function () {
     Route::prefix("/dashboard")->group(function () {
         Route::get("/", [DashboardController::class, "index"])->name("dashboard.index");
+        Route::get('/search', [SearchController::class, 'search'])
+               ->name('dashboard.search');
     
         Route::resource('/products', ProductController::class);
+        Route::resource('/categories', CategoryController::class);
     
         Route::get("/orders", [OrderController::class , "index"])->name("dashboard.orders");
         Route::get("/orders/{id}", [OrderController::class , "show"])->name("orders.show");
@@ -47,7 +52,6 @@ Route::middleware(["auth" , "isAdmin" ])->group(function () {
         Route::get("/orders-export", [OrderController::class , "exportOrder"])->name("orders.export");
         Route::get("/orders/{id}/print", [OrderController::class , "printOrder"])->name("orders.print");
     
-        Route::resource('/categories', CategoryController::class);
     
         Route::get("/users", [ControllersUserController::class , "index"])->name("dashboard.users");
         Route::get("/users/{id}", [ControllersUserController::class , "show"])->name("users.show");
@@ -59,6 +63,9 @@ Route::middleware(["auth" , "isAdmin" ])->group(function () {
         Route::put("/portfolio/{id}",[PorfolioController::class , "update"])->name("user.update");
         Route::put("/portfolio/{id}/remove-avator", [PorfolioController::class , "removeAvatar"])->name("user.remove_avator");
         Route::put("/portfolio/changePassword/{id}",[PorfolioController::class , "changePassword"])->name("user.changePassword");
+        Route::put('/user/{id}/change-email', [UserController::class, 'changeEmail'])->name('user.changeEmail');
+
+        Route::get('/handlers/report', [HandlerController::class, 'report'])->name('handlers.report');
     });
 });
 Route::get('/forgot-password', [PasswordResetController::class, 'showForgotForm'])

@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Services\CloudinaryService;
+use App\Services\OtpService;
+use App\Services\PasswordService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -15,6 +17,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CloudinaryService::class, function ($app) {
             return new CloudinaryService();
         });
+
+        
     }
 
     /**

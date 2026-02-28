@@ -1,206 +1,326 @@
 <?php
 
-namespace App\Http\Controllers\api;
-use App\Http\Controllers\api\BaseController;
+namespace App\Http\Controllers\Api;
+
 use App\Http\Controllers\Controller;
-use App\Mail\OrderStatusMail;
 use App\Models\Order;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Stripe\Stripe;
+use Stripe\Checkout\Session;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
-class PaymentController extends BaseController
+use function Laravel\Prompts\info;
+
+class PaymentController extends Controller
 {
-    /**
-     * Create Stripe Checkout Session
-     */
-    public function createPaymentSession(Order $order)
+    public function __construct()
     {
+        Stripe::setApiKey(config('services.stripe.secret'));
+    }
+
+    /**
+     * Create Checkout Session (with return URL)
+     */
+    public function createCheckoutSession(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:orders,id'
+        ]);
+
         try {
-            abort_if($order->user_id !== Auth::id(), 403);
+            $order = Order::with('items.product')->findOrFail($request->order_id);
 
-            if ($order->payment_status === 'paid') {
-                return $this->sendError('Order is already paid', [], 400);
+            if($order->user_id !== $request->user()->id) {
+                return response()->json(['error' => 'Unauthorized'], 403);
             }
 
-            $order->load('itemOrders.product', 'user');
-
-            if ($order->itemOrders->isEmpty()) {
-                return $this->sendError('Order has no items.', [], 400);
+            if($order->payment_status === 'paid') {
+                return response()->json(['error' => 'Order is already paid'], 400);
             }
 
+            // Build line items for Stripe
             $lineItems = [];
-
-            foreach ($order->itemOrders as $item) {
-                if (!$item->product) {
-                    return $this->sendError('Product no longer exists.', [], 400);
-                }
-
-                if ($item->product->stock < $item->quantity) {
-                    return $this->sendError(
-                        "Insufficient stock for {$item->product->title}", 
-                        [], 
-                        400
-                    );
-                }
+            foreach ($order->items as $item) {
 
                 $lineItems[] = [
                     'price_data' => [
-                        'currency' => 'usd',
+                        'currency' => 'egp',
                         'product_data' => [
                             'name' => $item->product->title,
-                            'description' => $item->product->description ?? '',
-                            'images' => $item->product->image 
-                                ? [url('storage/' . $item->product->image)] 
-                                : [],
+                            'description' => $item->product->description,
+                            'images' => [$item->product->image],
                         ],
-                        'unit_amount' => (int) round($item->unit_price * 100),
+                        'unit_amount' => (int)($item->price * 100), // Convert to cents
                     ],
                     'quantity' => $item->quantity,
                 ];
             }
 
-            if (empty($lineItems)) {
-                return $this->sendError('No valid products in the order.', [], 400);
+            // Add shipping as line item
+            if ($order->shipping_cost > 0) {
+                $lineItems[] = [
+                    'price_data' => [
+                        'currency' => 'egp',
+                        'product_data' => [
+                            'name' => 'Shipping - ' . ucfirst($order->shipping_method),
+                        ],
+                        'unit_amount' => (int)($order->shipping_cost * 100),
+                    ],
+                    'quantity' => 1,
+                ];
             }
 
-            Stripe::setApiKey(config('services.stripe.secret'));
+            // Add tax as line item
+            if ($order->tax > 0) {
+                $lineItems[] = [
+                    'price_data' => [
+                        'currency' => 'egp',
+                        'product_data' => [
+                            'name' => 'Tax (14%)',
+                        ],
+                        'unit_amount' => (int)($order->tax * 100),
+                    ],
+                    'quantity' => 1,
+                ];
+            }
 
-            $session = \Stripe\Checkout\Session::create([
+            if(empty($lineItems)) {
+                return response()->json(['error' => 'No items to purchase'], 400);
+
+                // info()->error();
+            }
+
+            foreach ($lineItems as $index => $item) {
+                info("Line Item #{$index}: " . json_encode($item));
+            }
+
+            // Frontend URLs
+            $frontendUrl  = "http://localhost:5174"; // Change to your frontend URL
+
+            // Create Checkout Session
+            $session = Session::create([
                 'payment_method_types' => ['card'],
                 'line_items' => $lineItems,
                 'mode' => 'payment',
-                'success_url' => route('payment.success', ['order' => $order->id]),
-                'cancel_url' => route('payment.cancel', ['order' => $order->id]),
-                'customer_email' => $order->user->email,
+                'success_url' => $frontendUrl . '/payment/success?session_id={CHECKOUT_SESSION_ID}&order_id=' . $order->id,
+                'cancel_url' => $frontendUrl . '/payment/cancel?order_id=' . $order->id,
+                'customer_email' => $order->customer_email,
                 'metadata' => [
                     'order_id' => $order->id,
-                    'user_id' => $order->user_id,   
+                    'order_number' => $order->order_number,
                 ],
-                'payment_intent_data' => [
-                    'metadata' => [
-                        'order_id' => $order->id,
-                    ],
-                ],
-                'expires_at' => now()->addMinutes(30)->timestamp, 
+                'client_reference_id' => $order->order_number,
             ]);
 
-            DB::transaction(function () use ($order, $session) {
-                $order->update([
-                    'payment_session_id' => $session->id,
-                    'payment_status' => 'pending',
-                ]);
-            });
-
-            return $this->sendResponse(
-                [
-                    'checkout_url' => $session->url,
-                    'session_id' => $session->id,
-                ],
-                'Payment session created successfully.'
-            );
-
-        } catch (\Stripe\Exception\ApiErrorException $e) {
-            Log::error('Stripe API Error: ' . $e->getMessage(), [
-                'order_id' => $order->id,
-                'error' => $e->getError()
+            // Store session ID in order
+            $order->update([
+                'payment_session_id' => $session->id
             ]);
-            
-            return $this->sendError(
-                'Payment service error. Please try again.', 
-                [], 
-                500
-            );
-            
+
+            return response()->json([
+                'url' => $session->url
+            ]);
+
         } catch (\Exception $e) {
-            Log::error('Payment Session Error: ' . $e->getMessage(), [
-                'order_id' => $order->id
-            ]);
-            
-            return $this->sendError(
-                'An error occurred. Please try again.', 
-                [], 
-                500
-            );
+            Log::error('Checkout Session Error: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     /**
-     * Payment Success Redirect (UI ONLY)
-     * Stripe Webhook is the authority
+     * Verify Payment after return from Stripe
      */
-    public function handleSuccess(Request $request, Order $order)
+    public function verifyPayment(Request $request)
     {
-        abort_if($order->user_id !== Auth::id(), 403);
-        
-        return redirect(
-            config('app.frontend_url') . '/orders/' . $order->id
-        );
+        $request->validate([
+            'session_id' => 'required|string',
+            'order_id' => 'required|exists:orders,id'
+        ]);
+
+        try {
+            // Retrieve session from Stripe
+            $session = Session::retrieve($request->session_id);
+            
+            $order = Order::findOrFail($request->order_id);
+
+            if ($session->payment_status === 'paid') {
+                DB::beginTransaction();
+
+                // Update order status
+                $order->update([
+                    'payment_status' => 'paid',
+                    'order_status' => 'processing',
+                    'payment_intent_id' => $session->payment_intent
+                ]);
+
+                // Reduce stock
+                foreach ($order->items as $item) {
+                    $item->product->decrement('stock', $item->quantity);
+                }
+
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment verified successfully',
+                    'order' => $order->load('items.product')
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment not completed',
+                'payment_status' => $session->payment_status
+            ], 400);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Payment Verification Error: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
+
     /**
-     * Payment Cancel Redirect
+     * Handle payment cancellation
      */
-    public function handleCancel(Order $order)
+    public function handleCancel(Request $request)
     {
-        if ($order->payment_status !== 'paid') {
+        $request->validate([
+            'order_id' => 'required|exists:orders,id'
+        ]);
+
+        try {
+            $order = Order::findOrFail($request->order_id);
+            
+            // Don't delete the order, just mark as cancelled
             $order->update([
                 'payment_status' => 'failed',
+                'order_status' => 'cancelled'
             ]);
-        }
 
-        return redirect(
-            config('app.frontend_url') . '/orders/' . $order->id
-        );
+            return response()->json([
+                'message' => 'Order cancelled',
+                'order' => $order
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Cancel Error: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
+
     /**
-     * Stripe Webhook (FINAL AUTHORITY)
+     * Webhook Handler for Stripe Events
      */
-    public function handleWebhook(Request $request)
+    public function webhook(Request $request)
     {
-        $endpoint_secret = config('services.stripe.webhook_secret');
-        
         $payload = $request->getContent();
-        $sig_header = $request->header('Stripe-Signature');
-        
+        $sigHeader = $request->header('Stripe-Signature');
+        $endpointSecret = config('payment.stripe.webhook_secret');
+
         try {
             $event = \Stripe\Webhook::constructEvent(
-                $payload, 
-                $sig_header, 
-                $endpoint_secret
+                $payload,
+                $sigHeader,
+                $endpointSecret
             );
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Webhook error'], 400);
-        }
 
-        // Handle the event
-        if ($event->type === 'checkout.session.completed') {
-            $session = $event->data->object;
-            
-            $order = Order::where('payment_session_id', $session->id)->first();
-            
-            if ($order) {
-                DB::transaction(function () use ($order, $session) {
+            Log::info('Stripe Webhook Event: ' . $event->type);
+
+            switch ($event->type) {
+                case 'checkout.session.completed':
+                    $session = $event->data->object;
+                    $this->handleCheckoutCompleted($session);
+                    break;
+
+                case 'checkout.session.expired':
+                    $session = $event->data->object;
+                    $this->handleCheckoutExpired($session);
+                    break;
+
+                case 'payment_intent.succeeded':
+                    $paymentIntent = $event->data->object;
+                    Log::info('Payment succeeded: ' . $paymentIntent->id);
+                    break;
+
+                case 'payment_intent.payment_failed':
+                    $paymentIntent = $event->data->object;
+                    $this->handlePaymentFailed($paymentIntent);
+                    break;
+
+                default:
+                    Log::info('Unhandled event type: ' . $event->type);
+            }
+
+            return response()->json(['status' => 'success']);
+
+        } catch (\Exception $e) {
+            Log::error('Webhook Error: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    private function handleCheckoutCompleted($session)
+    {
+        $orderId = $session->metadata->order_id ?? null;
+        
+        if ($orderId) {
+            DB::beginTransaction();
+            try {
+                $order = Order::find($orderId);
+                if ($order && $order->payment_status !== 'paid') {
                     $order->update([
                         'payment_status' => 'paid',
-                        'status' => 'confirmed',
-                        'payment_method' => 'stripe',
-                        'transaction_id' => $session->payment_intent,
-                        'paid_at' => now(),
+                        'order_status' => 'processing',
+                        'payment_intent_id' => $session->payment_intent,
+                        'paid_at' => now()
                     ]);
-                    
-                    foreach ($order->itemOrders as $item) {
+
+                    // Reduce stock
+                    foreach ($order->items as $item) {
                         $item->product->decrement('stock', $item->quantity);
                     }
-                    
-                    // Send confirmation email
-                    // Mail::to($order->user)->send(new OrderConfirmed($order));
-                });
+
+                    Log::info("Order #{$order->order_number} payment completed via webhook");
+                }
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error('Webhook order update failed: ' . $e->getMessage());
             }
         }
+    }
 
-        return response()->json(['success' => true]);
+    private function handleCheckoutExpired($session)
+    {
+        $orderId = $session->metadata->order_id ?? null;
+        
+        if ($orderId) {
+            $order = Order::find($orderId);
+            if ($order) {
+                $order->update([
+                    'payment_status' => 'failed',
+                    'order_status' => 'cancelled'
+                ]);
+                Log::warning("Order #{$order->order_number} checkout session expired");
+            }
+        }
+    }
+
+    private function handlePaymentFailed($paymentIntent)
+    {
+        // You can implement additional logic here if needed
+        Log::warning('Payment failed: ' . $paymentIntent->id);
+    }
+
+    /**
+     * Get Stripe Public Key
+     */
+    public function getPublicKey()
+    {
+        return response()->json([
+            'publicKey' => config('services.stripe.public_key')
+        ]);
     }
 }
