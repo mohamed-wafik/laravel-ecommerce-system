@@ -20,7 +20,10 @@ class CategoryController extends Controller
         $categories = Category::with('products')->paginate(10);
         return view('dashboard.category.index', compact('categories'));
     }
-
+    public function create()
+    {
+        return view('dashboard.category.create');
+    }
     public function store(StoreCategoryRequest $request)
     {
         $data = $request->validated();
@@ -33,7 +36,7 @@ class CategoryController extends Controller
 
         Category::create($data);
 
-        return redirect()->back()
+        return redirect()->route('categories.index')
             ->with('success', 'Category created successfully!');
     }
 
@@ -48,6 +51,19 @@ class CategoryController extends Controller
         }
 
         return view('dashboard.category.show', compact('category'));
+    }
+
+    public function edit($id)
+    {
+        $category = Category::find($id);
+
+        if (!$category) {
+            return redirect()
+                ->back()
+                ->with('error', 'Category not found!');
+        }
+
+        return view('dashboard.category.edit', compact('category'));
     }
 
     public function update(Request $request, $id)
@@ -83,8 +99,9 @@ class CategoryController extends Controller
 
         $category->update($validated);
 
-        return redirect()->back()
-            ->with('success', 'Category updated successfully!');
+        return redirect()
+                ->route('categories.index')
+                ->with('success', 'Category updated successfully!');
     }
 
 

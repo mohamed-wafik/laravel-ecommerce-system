@@ -15,14 +15,14 @@ class ItemOrderFactory extends Factory
     public function definition(): array
     {
         $quantity = $this->faker->numberBetween(1, 5);
-        $unit_price = $this->faker->randomFloat(2, 5, 500);
+        $price = $this->faker->randomFloat(2, 5, 500);
 
         return [
             'order_id' => Order::factory(),
             'product_id' => Product::factory(),
             'quantity' => $quantity,
-            'unit_price' => $unit_price,
-            'subtotal' => round($quantity * $unit_price, 2),
+            'price' => $price,
+            'total' => round($quantity * $price, 2),
         ];
     }
 }

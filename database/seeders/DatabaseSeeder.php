@@ -44,9 +44,9 @@ class DatabaseSeeder extends Seeder
             for ($i = 0; $i < $ordersCount; $i++) {
                 $order = Order::factory()->create([
                     'user_id' => $user->id,
-                    'total_amount' => 0,
-                    'status' => fake()->randomElement(['pending', 'shipped', 'delivered', 'cancelled']),
-                    'payment_id' => fake()->boolean(60) ? fake()->uuid() : null,
+                    'total' => 0,
+                    'order_status' => fake()->randomElement(['pending', 'processing', 'shipped', 'delivered', 'cancelled']),
+                    'payment_intent_id' => fake()->boolean(60) ? fake()->uuid() : null,
                 ]);
 
                 $selectedProducts = $products->random(rand(1, 5));
@@ -61,14 +61,14 @@ class DatabaseSeeder extends Seeder
                         'order_id' => $order->id,
                         'product_id' => $product->id,
                         'quantity' => $quantity,
-                        'unit_price' => $unitPrice,
-                        'subtotal' => $subtotal,
+                        'price' => $unitPrice,
+                        'total' => $subtotal,
                     ]);
 
                     $total += $subtotal;
                 }
 
-                $order->update(['total_amount' => round($total, 2)]);
+                $order->update(['total' => round($total, 2)]);
             }
 
             // --- 4️⃣ Create Cart Items ---

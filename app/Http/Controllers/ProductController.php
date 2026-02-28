@@ -40,8 +40,11 @@ class ProductController extends Controller
 
         return view("dashboard.product.index", compact("products", "categories","filters"));
     }
-
-
+    public function create()
+    {
+        $categories = Category::all();
+        return view('dashboard.product.create', compact('categories'));
+    }
     public function store(StoreProductRequest $request)
     {
         $data = $request->validated();
@@ -54,71 +57,91 @@ class ProductController extends Controller
 
         Product::create($data);
 
-        return redirect()->back()
-            ->with('success', 'Product created successfully!');
+        return redirect()
+                ->route('products.index')
+                ->with('success', 'Product created successfully!');
     }
 
     public function show($id)
     {
-        $product = Product::with(['category'])
-            ->withCount(['orders',])
-            ->findOrFail($id);
-            
-        return view('dashboard.product.show', compact('product' ));
+        try {
+            $product = Product::with(['category', 'orders'])
+                ->withCount('orders')
+                ->findOrFail($id);
+
+            return view('dashboard.product.show', compact('product'));
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->back()
+                ->with('error', 'Product not found!');
+        }
+    }
+
+    public function edit($id)
+    {
+        try {
+            $product = Product::findOrFail($id);
+            $categories = Category::all();
+
+            return view('dashboard.product.edit', compact('product', 'categories'));
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->back()
+                ->with('error', 'Product not found!');
+        }
     }
 
     public function update(StoreProductRequest $request, $id)  
     {
-        $product = Product::find($id);
+        try {
+            $product = Product::findOrFail($id);
 
-        if (!$product) {
+            $data = $request->validated();
+
+            if ($request->hasFile('image')) {
+                if ($product->image_public_id) {
+                    $check = $this->cloudinaryService->deleteFile($product->image_public_id);
+                    if (!$check) {
+                        return redirect()
+                            ->back()
+                            ->with('error', 'Failed to delete existing image from Cloudinary!');
+                    }
+                }
+
+                $result = $this->cloudinaryService->uploadFile($request->file('image'));
+                $data['image'] = $result['secure_url'] ?? ($result['url'] ?? null);
+                $data['image_public_id'] = $result['public_id'] ?? null;
+            } 
+
+            $product->update($data);
+
+            return redirect()->route('products.index')
+                ->with('success', 'Product updated successfully!');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return redirect()
                 ->back()
                 ->with('error', 'Product not found!');
         }
-
-        $data = $request->validated();
-
-        if ($request->hasFile('image')) {
-            if ($product->image_public_id) {
-                $check = $this->cloudinaryService->deleteFile($product->image_public_id);
-                if (!$check) {
-                    return redirect()->back()
-                        ->with('error', 'Failed to delete existing image from Cloudinary!');
-                }
-            }
-
-            $result = $this->cloudinaryService->uploadFile($request->file('image'));
-            $data['image'] = $result['secure_url'] ?? ($result['url'] ?? null);
-            $data['image_public_id'] = $result['public_id'] ?? null;
-        } 
-
-        $product->update($data);
-
-        return redirect()->back()
-            ->with('success', 'Product updated successfully!');
     }
 
     public function destroy($id)  
     {
-        $product = Product::find($id);
+        try {
+            $product = Product::findOrFail($id);
 
-        if (!$product) {
+            if ($product->image_public_id) {
+                $check = $this->cloudinaryService->deleteFile($product->image_public_id);
+                if (!$check) {
+                    return redirect()->back()
+                        ->with('error', 'Failed to delete image from Cloudinary!');
+                }
+            }
+
+            $product->delete();
+
+            return redirect()->back()
+                ->with('success', 'Product deleted successfully!');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return redirect()->back()
                 ->with('error', 'Product not found!');
         }
-
-        if ($product->image_public_id) {
-            $check = $this->cloudinaryService->deleteFile($product->image_public_id);
-            if (!$check) {
-                return redirect()->back()
-                    ->with('error', 'Failed to delete image from Cloudinary!');
-            }
-        }
-
-        $product->delete();
-
-        return redirect()->back()
-            ->with('success', 'Product deleted successfully!');
     }
 }
