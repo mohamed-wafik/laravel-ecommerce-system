@@ -68,7 +68,7 @@ class AuthController extends BaseController
         $validated = $request->validate([
             'name' => ['required', 'string', 'min:3', 'max:50'],
             'email' => ['required', 'email', 'unique:users,email'],
-            'password' => ['required', 'confirmed', Password::min(6)],
+            'password' => ['required' , Password::min(6)],
         ]);
 
         $user = DB::transaction(function () use ($validated) {

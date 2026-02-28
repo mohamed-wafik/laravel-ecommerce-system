@@ -16,16 +16,16 @@ return new class extends Migration
                 $table->string('payment_status')->default('pending')->after('total_amount');
             }
 
-            if (!Schema::hasColumn('orders', 'payment_tsession_id')) {
-                $table->string('payment_tsession_id')->nullable()->after('payment_status');
+            if (!Schema::hasColumn('orders', 'payment_session_id')) {
+                $table->string('payment_session_id')->nullable()->after('payment_status');
             }
 
-            if (!Schema::hasColumn('orders', 'payment_id')) {
-                $table->string('payment_id')->nullable()->after('payment_tsession_id');
+            if (!Schema::hasColumn('orders', 'payment_intent_id')) {
+                $table->string('payment_intent_id')->nullable()->after('payment_session_id');
             }
             
             if (!Schema::hasColumn('orders', 'transaction_id')) {
-                $table->string('transaction_id')->nullable()->after('payment_id');
+                $table->string('transaction_id')->nullable()->after('payment_intent_id');
             }
 
             if (!Schema::hasColumn('orders', 'paid_at')) {
@@ -47,13 +47,13 @@ return new class extends Migration
             if (Schema::hasColumn('orders', 'transaction_id')) {
                 $table->dropColumn('transaction_id');
             }
-
-            if (Schema::hasColumn('orders', 'payment_id')) {
-                $table->dropColumn('payment_id');
+            
+            if (Schema::hasColumn('orders', 'payment_session_id')) {
+                $table->dropColumn('payment_session_id');
             }
 
-            if (Schema::hasColumn('orders', 'payment_tsession_id')) {
-                $table->dropColumn('payment_tsession_id');
+            if (Schema::hasColumn('orders', 'payment_intent_id')) {
+                $table->dropColumn('payment_intent_id');
             }
 
             if (Schema::hasColumn('orders', 'payment_status')) {

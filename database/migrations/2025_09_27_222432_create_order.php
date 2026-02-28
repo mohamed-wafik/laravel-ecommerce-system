@@ -6,27 +6,38 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+    public function up()
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
+            $table->string('order_number')->unique();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->dateTime('order_date')->useCurrent();
-            $table->enum('status', ['pending', 'shipped', 'delivered', 'cancelled'])->default('pending');
-            $table->decimal('total_amount', 10, 2);
+            $table->string('customer_name');
+            $table->string('customer_email');
+            $table->string('customer_phone');
+            $table->text('shipping_address');
+            $table->string('city');
+            $table->string('postal_code')->nullable();
+            $table->enum('shipping_method', ['standard', 'express', 'pickup'])->default('standard');
+            $table->decimal('shipping_cost', 8, 2)->default(0);
+            $table->decimal('subtotal', 10, 2);
+            $table->decimal('discount', 10, 2)->default(0);
+            $table->decimal('tax', 10, 2)->default(0);
+            $table->decimal('total', 10, 2);
+            $table->enum('payment_method', ['cod', 'card', 'wallet'])->default('cod');
+            $table->enum('payment_status', ['pending', 'paid', 'failed'])->default('pending');
+            $table->string('payment_session_id')->nullable();
+            $table->string('payment_intent_id')->nullable();
+            $table->string('payment_id')->nullable();
+            $table->string('transaction_id')->nullable();
+            $table->timestamp('paid_at')->nullable();
+            $table->enum('order_status', ['pending', 'processing', 'shipped', 'delivered', 'cancelled'])->default('pending');
             $table->timestamps();
         });
-
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
-        Schema::dropIfExists('order');
+        Schema::dropIfExists('orders');
     }
 };

@@ -54,5 +54,12 @@ return [
     "stripe" => [
         "secret"  => env("STRIPE_SECRET"),
         "webhook_secret" => env("STRIPE_WEBHOOK_SECRET")
-    ]
+    ],
+
+    
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+    ],
+
+
 ];

@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>@yield('title', 'Dashboard')</title>
+        <style> 
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-5px); }
+                75% { transform: translateX(5px); }
+            }
+
+            .animate-shake {
+                animation: shake 0.3s ease-in-out;
+            }
+
+            #image {
+                position: absolute;
+                opacity: 0;
+                pointer-events: none;
+            }
+    </style>
     @vite('resources/css/app.css')
     @stack('style')
 </head>
@@ -18,9 +35,11 @@
             @yield('content')
         </main>
     </div>
-    
+
+
     @include("components.toast")
     @vite('resources/js/app.js')
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         const links = document.querySelectorAll("#sidebar .sidebar-item");
         const pathname = location.origin + location.pathname;
@@ -30,33 +49,6 @@
             } else {
                 link.classList.remove("active");
             }
-        })
-        const mobileMenuButton = document.getElementById('mobileMenuButton');
-        const sidebar = document.getElementById('sidebar');
-        const sidebarOverlay = document.getElementById('sidebarOverlay');
-
-        mobileMenuButton.addEventListener('click', () => {
-            sidebar.classList.toggle('-translate-x-full');
-            sidebarOverlay.classList.toggle('hidden');
-        });
-
-        sidebarOverlay.addEventListener('click', () => {
-            sidebar.classList.add('-translate-x-full');
-            sidebarOverlay.classList.add('hidden');
-        });
-        
-        const currentUrl = window.location.href; 
-
-        document.querySelectorAll("#dashboard_side nav ul li a").forEach(a => {
-            if (a.getAttribute("href") === currentUrl.split("?")[0]) {
-                console.log(a.getAttribute("href"))
-                a.parentElement.classList.add("active"); 
-            } else {
-                a.parentElement.classList.remove("active");
-            }
-        });
-        document.getElementById("userMenuButton").addEventListener("click" , () => {
-            document.querySelector("#userMenuButton + ul").classList.toggle("hidden")
         })
     </script>
     @stack('script')

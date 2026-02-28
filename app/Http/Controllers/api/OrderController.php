@@ -1,53 +1,33 @@
 <?php
 
-namespace App\Http\Controllers\api;
+namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\api\BaseController;
-use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreOrderRequest;
 use App\Models\Cart;
-use App\Models\ItemOrder;
+use App\Models\Order;
 use App\Models\Product;
-use App\Http\Resources\OrderResource;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
-use Stripe\Stripe;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class OrderController extends BaseController
 {
-    public function index(Request $req)
+    public function index(Request $request)
     {
-        $user = $req->user();
-
-        $orders = $user->orders()->with('itemOrders.product')->get();
-
-        return $this->sendResponse(OrderResource::collection($orders), 'Orders retrieved successfully');
+        $user = $request->user();
+        $orders = Order::where('user_id', $user->id)
+            ->with('items.product')
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        return $this->sendResponse($orders, 'Orders retrieved successfully');
     }
-
-    public function show(Request $req, $id)
+    
+    public function store(StoreOrderRequest $request)
     {
-        $user = $req->user();
-
-        $order = $user->orders()
-                      ->with('itemOrders.product')
-                      ->find($id);
-
-        if (!$order) {
-            return $this->sendError('Order not found', [], 404);
-        }
-
-        return $this->sendResponse(OrderResource::make($order), 'Order retrieved successfully');
-    }
-
-    /**
-     * Create order using CART TABLE
-     */
-    public function store(Request $req)
-    {
-        $req->validate([
-            'country' => 'required|string|max:100',
-        ]);
-
-        $user = $req->user();
+        $validator = $request->validate();
+        
+        $user = $request->user();
 
         $carts = Cart::where('user_id', $user->id)
             ->with('product')
@@ -57,84 +37,142 @@ class OrderController extends BaseController
             return $this->sendError('Cart is empty', [], 400);
         }
 
-        $totalAmount = 0;
-        $lineItems = [];
-        $itemOrders = [];
-
-        DB::beginTransaction();
-
         try {
+            DB::beginTransaction();
+
+            $subtotal = 0;
+            $orderItems = [];
+
             foreach ($carts as $cart) {
-                $product = Product::where('id', $cart->product_id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$product) {
-                    throw new \Exception('A product in cart does not exist anymore.');
-                }
-
+                $product = Product::findOrFail($cart->product_id);
+                
                 if ($product->stock < $cart->quantity) {
-                    throw new \Exception("Insufficient stock for: {$product->title}");
+                    return response()->json([
+                        'error' => "Product '{$product->name}' has insufficient stock"
+                    ], 400);
                 }
 
-                $product->decrement('stock', $cart->quantity);
+                $itemTotal = $product->price * $cart->quantity;
+                $subtotal += $itemTotal;
 
-                $discount = $product->discount ?? 0;
-                $priceAfterDiscount = $product->price * (1 - $discount);
-                $subtotal = $priceAfterDiscount * $cart->quantity;
-
-                $totalAmount += $subtotal;
-
-                $lineItems[] = [
-                    'price_data' => [
-                        'currency' => 'usd',
-                        'product_data' => [
-                            'name' => $product->title,
-                            'images' => [$product->image],
-                        ],
-                        'unit_amount' => (int) round($priceAfterDiscount * 100),
-                    ],
-                    'quantity' => $cart->quantity,
-                ];
-
-                $itemOrders[] = [
+                $orderItems[] = [
                     'product_id' => $product->id,
                     'quantity' => $cart->quantity,
-                    'unit_price' => $priceAfterDiscount,
-                    'subtotal' => $subtotal,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'price' => $product->price,
+                    'total' => $itemTotal
                 ];
             }
 
+            // Shipping cost
+            $shippingCost = config("payment.shipping_rates.{$request->shipping_method}", 30);
+            
+            $discount = 0;
+            if ($request->coupon_code) {
+                $discount = $this->applyCoupon($request->coupon_code, $subtotal);
+            }
+            
+            // Tax
+            $taxableAmount = $subtotal - $discount;
+            $tax = round($taxableAmount * config('payment.tax_rate'), 2);
+            
+            // Total
+            $total = round($taxableAmount + $shippingCost + $tax, 2);
+
+            // Create order
+            $order = Order::create([
+                'user_id' => $user->id,
+                'customer_name' => $request->customer_name,
+                'customer_email' => $request->customer_email,
+                'customer_phone' => $request->customer_phone,
+                'shipping_address' => $request->shipping_address,
+                'city' => $request->city,
+                'postal_code' => $request->postal_code,
+                'shipping_method' => $request->shipping_method,
+                'shipping_cost' => $shippingCost,
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'tax' => $tax,
+                'total' => $total,
+                'payment_method' => "cod",
+                'payment_status' => 'pending',
+                'order_status' => 'pending'
+            ]);
+
+            foreach ($orderItems as $item) {
+                $order->items()->create([
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'price' => $item['price'],
+                    'total' => $item['total']
+                ]);
+            }
+
+            if ($request->payment_method === 'cod') {
+                foreach ($orderItems as $item) {
+                    Product::find($item['product_id'])->decrement('stock', $item['quantity']);
+                }
+                $order->update(['order_status' => 'processing']);
+            }
+            
+            // Clear cart
+            Cart::where('user_id', $user->id)->delete();
+
             DB::commit();
-        } catch (\Throwable $e) {
+
+            return $this->sendResponse($order, 'Order created successfully');
+
+        } catch (\Exception $e) {
             DB::rollBack();
-            return $this->sendError('Order creation failed', ['error' => $e->getMessage()], 400);
+            return $this->sendError('Order creation failed', ['error' => $e->getMessage()], 500);
         }
-
-
-
-        $order = $user->orders()->create([
-            'country' => $req->country,
-            'total_amount' => $totalAmount,
-            'payment_status' => 'pending',
-        ]);
-
-
-        foreach ($itemOrders as &$item) {
-            $item['order_id'] = $order->id;
-        }
-
-        ItemOrder::insert($itemOrders);
-
-
-        Cart::where('user_id', $user->id)->delete();
-
-        $order->load('itemOrders.product');
-
-        return $this->sendResponse(OrderResource::make($order), 'Order placed successfully');
-        
     }
 
+    private function applyCoupon($code, $subtotal)
+    {
+        // Simple coupon logic - you can expand this
+        $coupons = [
+            'SAVE10' => 0.10, // 10% off
+            'SAVE20' => 0.20, // 20% off
+            'FLAT50' => 50,   // Flat 50 EGP off
+        ];
+
+        if (isset($coupons[$code])) {
+            $discount = $coupons[$code];
+            return $discount < 1 ? $subtotal * $discount : $discount;
+        }
+
+        return 0;
+    }
+
+    public function show($orderNumber)
+    {
+        $order = Order::where('id', $orderNumber)
+            ->with('items.product')
+            ->firstOrFail();
+        
+        return $this->sendResponse($order, 'Order details retrieved successfully');
+    }
+
+    public function updatePaymentStatus(Request $request, $orderId)
+    {
+        $request->validate([
+            'payment_status' => 'required|in:pending,paid,failed'
+        ]);
+        
+        $order = Order::findOrFail($orderId);
+        
+        $order->update([
+            'payment_status' => $request->payment_status,
+            'order_status' => $request->payment_status === 'paid' ? 'processing' : 'pending'
+        ]);
+
+        // Reduce stock when payment is confirmed
+        if ($request->payment_status === 'paid') {
+            foreach ($order->items as $item) {
+                $item->product->decrement('stock', $item->quantity);
+            }
+        }
+
+        return $this->sendResponse($order, 'Payment status updated successfully');
+    }
 }

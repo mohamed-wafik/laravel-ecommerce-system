@@ -37,7 +37,6 @@ class PorfolioController extends Controller
 
         $validated = $request->validate([
             "name" => "nullable|string|min:2|max:50",
-            "email" => "nullable|email|unique:users,email," . $user->id,
             "image" => "nullable|image|mimes:jpg,jpeg,png,gif|max:2048",
         ]);
 
@@ -62,7 +61,31 @@ class PorfolioController extends Controller
 
         return redirect()->back()->with('success', 'Profile updated successfully!');
     }
+    public function updateEmail(Request $request, $id)
+    {
+        $user = User::find($id);
 
+        if (!$user) {
+            return redirect()->back()->with("error", "User not found!");
+        }
+
+        if (Auth::id() !== +$id) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $validated = $request->validate([
+            "email" => "required|email|unique:users,email," . $id,
+            "password" => "required|string|min:6|max:50",
+        ]);
+
+        if (!Hash::check($validated["password"], $user->password)) {
+            return redirect()->back()->with('error', 'Password is incorrect!');
+        }
+        
+        $user->update($validated);
+
+        return redirect()->back()->with('success', 'Email updated successfully!');
+    }
     public function changePassword(Request $request, $id)
     {
         $user = User::find($id);

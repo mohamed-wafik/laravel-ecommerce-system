@@ -3,17 +3,17 @@
 namespace App\Http\Controllers\api;
 
 use App\Http\Controllers\api\BaseController;
-use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use Illuminate\Http\Request;
 
 class ProductController extends BaseController
 {
+
     public function index(Request $request)
     {
         $filters = $request->query();
-
+        
         $query = Product::with('category')
             ->withCount('reviews')
             ->withAvg('reviews', 'rating');
@@ -33,23 +33,21 @@ class ProductController extends BaseController
         if (!empty($filters['min_price'])) {
             $query->where('price', '>=', $filters['min_price']);
         }
+
         if (!empty($filters['max_price'])) {
             $query->where('price', '<=', $filters['max_price']);
         }
 
+        // AI Search Integration
         if (!empty($filters['search'])) {
-            $query->where(function ($q) use ($filters) {
-                $q->where('title', 'like', '%' . $filters['search'] . '%')
-                ->orWhere('description', 'like', '%' . $filters['search'] . '%');
-            });
+            $query->where("title", "like", "%" . $filters['search']. "%")
+                ->orWhere("description", "like", "%" . $filters['search'] . "%");
         }
 
         $products = $query->paginate(10)->appends($filters);
 
         return $this->sendResponse($products, 'Products retrieved successfully');
-
     }
-
 
     public function getTopDeal() {
         $topProducts = Product::withCount(['orders', 'reviews'])

@@ -4,15 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Exports\usersExport;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Request;
 use Maatwebsite\Excel\Facades\Excel;
 
 class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $filters = $request::query();
+        $filters = $request->query();
         $query = User::query();
 
         if (isset($filters['role']) && $filters['role'] !== '') {
@@ -32,12 +32,13 @@ class UserController extends Controller
         return view('dashboard.users.index', compact('users'));
     }
     public function show($id) {
-        $user = User::with("orders")->findOrFail($id);
+        $user = User::with("orders")
+              ->findOrFail($id);
         return view("dashboard.users.show",compact("user"));
     }
     public function updateRole(Request $request, $id)
     {
-        $request::validate([
+        $request->validate([
             'role' => 'required|in:admin,user,manager',
         ]);
 
@@ -45,7 +46,7 @@ class UserController extends Controller
             return response()->json(['error' => 'You cannot change your own role.'], 403);
         }
         $user = User::findOrFail($id);
-        $user->role = $request::input('role');
+        $user->role = $request->input('role');
         $user->save();
 
         return response()->json(["role" => $user->role], 200);
@@ -55,10 +56,6 @@ class UserController extends Controller
     {
         if(Auth::id() == $id || Auth::user()->role != 'admin') {
             return response()->json(['error' => 'You cannot delete this user.'], 403);
-        }
-        if(User::findOrFail($id)->orders()->exists()) {
-            return response()
-                    ->json(['error' => 'Cannot delete user with existing orders.'], 400);
         }
         if(User::findOrFail($id)->role == 'admin') {
             return response()
