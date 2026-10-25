@@ -1,0 +1,179 @@
+import { Search, X } from "lucide-react";
+
+import type { ICategory } from "./index";
+import FilterBadge from "../../../components/ui/FilterBadge";
+import FilterField from "../../../components/ui/FilterField";
+import { inputClass } from "../../../data/input";
+import type {
+  CategoryFilterField,
+  ICategoryFilters,
+} from "../../../hook/useCategoryFilters";
+
+interface IProps {
+  filters: ICategoryFilters;
+
+  onFilterChange: (field: CategoryFilterField, value: string) => void;
+
+  onPerPageChange: (value: number) => void;
+
+  onClearFilters: () => void;
+
+  parentCategories: ICategory[] | null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Component                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const Toolbar = ({
+  filters,
+  onFilterChange,
+  onPerPageChange,
+  onClearFilters,
+  parentCategories,
+}: IProps) => {
+  const { search, parent_id, is_active, per_page } = filters;
+
+  const hasFilters = search || parent_id || is_active;
+
+  return (
+    <div className="overflow-hidden">
+      {/* Search header */}
+
+      <div className="flex flex-col gap-4 border-b border-border py-4 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative w-full lg:max-w-md">
+          <Search
+            size={18}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary"
+          />
+
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => onFilterChange("search", event.target.value)}
+            placeholder="Search by category name or slug..."
+            className={`${inputClass} pl-10 pr-4`}
+          />
+        </div>
+
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 self-start rounded-xl px-3 text-sm font-medium text-text-secondary transition hover:bg-error-50 hover:text-error lg:self-auto"
+          >
+            <X size={16} />
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* Filters */}
+
+      <div className="py-4 sm:py-5">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-sm font-semibold text-text-primary">
+            Filters
+          </span>
+
+          <span className="text-xs text-text-tertiary">
+            Refine your categories
+          </span>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* Parent Category */}
+
+          <FilterField label="Parent category">
+            <select
+              value={parent_id}
+              onChange={(event) =>
+                onFilterChange("parent_id", event.target.value)
+              }
+              className={inputClass}
+            >
+              <option value="">All categories</option>
+
+              {parentCategories?.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+
+          {/* Status */}
+
+          <FilterField label="Status">
+            <select
+              value={is_active}
+              onChange={(event) =>
+                onFilterChange("is_active", event.target.value)
+              }
+              className={inputClass}
+            >
+              <option value="">All status</option>
+              <option value="1">Active</option>
+              <option value="0">Inactive</option>
+            </select>
+          </FilterField>
+
+          {/* Per Page */}
+
+          <FilterField label="Per page">
+            <select
+              value={per_page}
+              onChange={(event) => onPerPageChange(Number(event.target.value))}
+              className={inputClass}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </FilterField>
+        </div>
+
+        {/* Active filter summary */}
+
+        {hasFilters && (
+          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+            <span className="mr-1 text-xs font-medium text-text-tertiary">
+              Active filters:
+            </span>
+
+            {/* Search */}
+
+            {search && (
+              <FilterBadge
+                label={`Search: ${search}`}
+                onRemove={() => onFilterChange("search", "")}
+              />
+            )}
+
+            {/* Parent */}
+
+            {parent_id && (
+              <FilterBadge
+                label="Parent category"
+                onRemove={() => onFilterChange("parent_id", "")}
+              />
+            )}
+
+            {/* Status */}
+
+            {is_active && (
+              <FilterBadge
+                label={`Status: ${is_active === "1" ? "Active" : "Inactive"}`}
+                onRemove={() => onFilterChange("is_active", "")}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Toolbar;

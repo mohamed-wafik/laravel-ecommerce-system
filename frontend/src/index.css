@@ -1,0 +1,199 @@
+/* Import Tailwind */
+@import "tailwindcss";
+
+/* ===================== */
+/*     Theme Colors      */
+/* ===================== */
+@theme {
+  /* Primary Colors - Main Brand Colors */
+  --color-primary: #4f46e5;
+  --color-primary-light: #6366f1;
+  --color-primary-dark: #3730a3;
+  --color-primary-50: #f0f4ff;
+  --color-primary-100: #e0e7ff;
+
+  /* Secondary Colors */
+  --color-secondary: #7c3aed;
+  --color-secondary-light: #8b5cf6;
+  --color-secondary-dark: #6d28d9;
+  --color-secondary-50: #f5f3ff;
+  --color-secondary-100: #ede9fe;
+
+  /* Accent Color - Highlights/CTAs */
+  --color-accent: #f59e0b;
+  --color-accent-light: #fbbf24;
+  --color-accent-dark: #d97706;
+  --color-accent-50: #fffbeb;
+  --color-accent-100: #fef3c7;
+
+  /* Success Colors */
+  --color-success: #10b981;
+  --color-success-light: #34d399;
+  --color-success-dark: #059669;
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+
+  /* Error/Danger Colors */
+  --color-error: #ef4444;
+  --color-error-light: #f87171;
+  --color-error-dark: #dc2626;
+  --color-error-50: #fef2f2;
+  --color-error-100: #fee2e2;
+
+  /* Warning Colors */
+  --color-warning: #f97316;
+  --color-warning-light: #fb923c;
+  --color-warning-dark: #ea580c;
+  --color-warning-50: #fff7ed;
+  --color-warning-100: #ffedd5;
+
+  /* Info Colors */
+  --color-info: #06b6d4;
+  --color-info-light: #22d3ee;
+  --color-info-dark: #0891b2;
+  --color-info-50: #ecf8fa;
+  --color-info-100: #cffafe;
+
+  /* Neutral/Grayscale Colors */
+  --color-dark: #1e1b4b;
+  --color-dark-secondary: #374151;
+  --color-dark-tertiary: #6b7280;
+
+  --color-light: #f8fafc;
+  --color-light-secondary: #f3f4f6;
+  --color-light-tertiary: #e5e7eb;
+
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  /* Text Colors */
+  --color-text-primary: #1e1b4b;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #9ca3af;
+  --color-text-light: #f8fafc;
+
+  /* Background Colors */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f9fafb;
+  --color-bg-tertiary: #f3f4f6;
+
+  /* Border Colors */
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+  --color-border-dark: #d1d5db;
+
+  /* E-commerce Specific Colors */
+  --color-price: #10b981;
+  --color-discount: #ef4444;
+  --color-rating: #f59e0b;
+  --color-stock-available: #10b981;
+  --color-stock-low: #f97316;
+  --color-stock-out: #ef4444;
+}
+
+/* ---------------------- */
+/*     Custom Animations  */
+/* ---------------------- */
+
+/* Subtle Bounce */
+@keyframes bounce-subtle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Fade In + Up */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Progress Bar Slide Animation */
+@keyframes progressBar {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Gentle Pulse */
+@keyframes pulse-gentle {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+/* Wiggle */
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+/* Float */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Reverse Float */
+@keyframes float-reverse {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+/* Slow Float */
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.active {
+  color: #4f46e5;
+}
